@@ -3,13 +3,6 @@
 ################################################################################
 
 # Each subdirectory must supply rules for building sources it contributes
-Example_F28377xLaunchPadDemo.obj: ../Example_F28377xLaunchPadDemo.c $(GEN_OPTS) | $(GEN_HDRS)
-	@echo 'Building file: $<'
-	@echo 'Invoking: C2000 Compiler'
-	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="Example_F28377xLaunchPadDemo.d" $(GEN_OPTS__FLAG) "$<"
-	@echo 'Finished building: $<'
-	@echo ' '
-
 F2837xS_Adc.obj: C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Adc.c $(GEN_OPTS) | $(GEN_HDRS)
 	@echo 'Building file: $<'
 	@echo 'Invoking: C2000 Compiler'
@@ -84,6 +77,13 @@ F2837xS_usDelay.obj: C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_comm
 	@echo 'Building file: $<'
 	@echo 'Invoking: C2000 Compiler'
 	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="F2837xS_usDelay.d" $(GEN_OPTS__FLAG) "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
+LAUNCHXL-F28377S-Test.obj: ../LAUNCHXL-F28377S-Test.c $(GEN_OPTS) | $(GEN_HDRS)
+	@echo 'Building file: $<'
+	@echo 'Invoking: C2000 Compiler'
+	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="LAUNCHXL-F28377S-Test.d" $(GEN_OPTS__FLAG) "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

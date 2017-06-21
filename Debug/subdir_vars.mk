@@ -12,7 +12,6 @@ C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Cod
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_usDelay.asm 
 
 C_SRCS += \
-../Example_F28377xLaunchPadDemo.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Adc.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_CpuTimers.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_DefaultISR.c \
@@ -22,10 +21,10 @@ C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Pie
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_PieVect.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Sci.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_SysCtrl.c \
+../LAUNCHXL-F28377S-Test.c \
 ../sci_io.c 
 
 OBJS += \
-./Example_F28377xLaunchPadDemo.obj \
 ./F2837xS_Adc.obj \
 ./F2837xS_CodeStartBranch.obj \
 ./F2837xS_CpuTimers.obj \
@@ -37,6 +36,7 @@ OBJS += \
 ./F2837xS_Sci.obj \
 ./F2837xS_SysCtrl.obj \
 ./F2837xS_usDelay.obj \
+./LAUNCHXL-F28377S-Test.obj \
 ./sci_io.obj 
 
 ASM_DEPS += \
@@ -44,7 +44,6 @@ ASM_DEPS += \
 ./F2837xS_usDelay.d 
 
 C_DEPS += \
-./Example_F28377xLaunchPadDemo.d \
 ./F2837xS_Adc.d \
 ./F2837xS_CpuTimers.d \
 ./F2837xS_DefaultISR.d \
@@ -54,10 +53,10 @@ C_DEPS += \
 ./F2837xS_PieVect.d \
 ./F2837xS_Sci.d \
 ./F2837xS_SysCtrl.d \
+./LAUNCHXL-F28377S-Test.d \
 ./sci_io.d 
 
 C_DEPS__QUOTED += \
-"Example_F28377xLaunchPadDemo.d" \
 "F2837xS_Adc.d" \
 "F2837xS_CpuTimers.d" \
 "F2837xS_DefaultISR.d" \
@@ -67,10 +66,10 @@ C_DEPS__QUOTED += \
 "F2837xS_PieVect.d" \
 "F2837xS_Sci.d" \
 "F2837xS_SysCtrl.d" \
+"LAUNCHXL-F28377S-Test.d" \
 "sci_io.d" 
 
 OBJS__QUOTED += \
-"Example_F28377xLaunchPadDemo.obj" \
 "F2837xS_Adc.obj" \
 "F2837xS_CodeStartBranch.obj" \
 "F2837xS_CpuTimers.obj" \
@@ -82,6 +81,7 @@ OBJS__QUOTED += \
 "F2837xS_Sci.obj" \
 "F2837xS_SysCtrl.obj" \
 "F2837xS_usDelay.obj" \
+"LAUNCHXL-F28377S-Test.obj" \
 "sci_io.obj" 
 
 ASM_DEPS__QUOTED += \
@@ -89,7 +89,6 @@ ASM_DEPS__QUOTED += \
 "F2837xS_usDelay.d" 
 
 C_SRCS__QUOTED += \
-"../Example_F28377xLaunchPadDemo.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Adc.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_CpuTimers.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_DefaultISR.c" \
@@ -99,6 +98,7 @@ C_SRCS__QUOTED += \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_PieVect.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Sci.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_SysCtrl.c" \
+"../LAUNCHXL-F28377S-Test.c" \
 "../sci_io.c" 
 
 ASM_SRCS__QUOTED += \

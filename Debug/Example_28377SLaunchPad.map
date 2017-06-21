@@ -1,10 +1,10 @@
 ******************************************************************************
              TMS320C2000 Linker PC v15.12.3                    
 ******************************************************************************
->> Linked Wed Jun 21 13:38:57 2017
+>> Linked Wed Jun 21 16:08:48 2017
 
 OUTPUT FILE NAME:   <Example_28377SLaunchPad.out>
-ENTRY POINT SYMBOL: "_c_int00"  address: 00084808
+ENTRY POINT SYMBOL: "_c_int00"  address: 00084957
 
 
 MEMORY CONFIGURATION
@@ -22,10 +22,10 @@ PAGE 0:
   BEGIN                 00080000   00000002  00000002  00000000  RWIX
   FLASHA                00080002   00001ffe  00000000  00001ffe  RWIX
   FLASHB                00082000   00002000  00001ffd  00000003  RWIX
-  FLASHC                00084000   00002000  00000c34  000013cc  RWIX
+  FLASHC                00084000   00002000  00000db3  0000124d  RWIX
   FLASHD                00086000   00002000  00000072  00001f8e  RWIX
   FLASHE                00088000   00008000  00000000  00008000  RWIX
-  FLASHF                00090000   00008000  00000374  00007c8c  RWIX
+  FLASHF                00090000   00008000  0000047a  00007b86  RWIX
   FLASHG                00098000   00008000  00000000  00008000  RWIX
   FLASHH                000a0000   00008000  00000000  00008000  RWIX
   FLASHI                000a8000   00008000  00000000  00008000  RWIX
@@ -165,7 +165,7 @@ codestart
                   00082000    00000031     rts2800_fpu32.lib : lowlev.obj (.cinit)
                   00082031    0000002a                       : defs.obj (.cinit)
                   0008205b    0000000e                       : exit.obj (.cinit)
-                  00082069    0000000c     Example_F28377xLaunchPadDemo.obj (.cinit)
+                  00082069    0000000c     LAUNCHXL-F28377S-Test.obj (.cinit)
                   00082075    00000005     rts2800_fpu32.lib : _lock.obj (.cinit:__lock)
                   0008207a    00000005                       : _lock.obj (.cinit:__unlock)
                   0008207f    00000004                       : errno.obj (.cinit)
@@ -197,77 +197,77 @@ ramfuncs   0    00086000    00000072     RUN ADDR = 00008000
                   00082094    00000bd9     rts2800_fpu32.lib : _printfi.obj (.text)
                   00082c6d    00000585     F2837xS_DefaultISR.obj (.text:retain)
                   000831f2    000002d7     F2837xS_SysCtrl.obj (.text)
-                  000834c9    0000027c     rts2800_fpu32.lib : trgdrv.obj (.text)
-                  00083745    00000244     F2837xS_Gpio.obj (.text)
-                  00083989    0000021b     rts2800_fpu32.lib : lowlev.obj (.text)
-                  00083ba4    000001d2                       : memory.obj (.text)
-                  00083d76    0000014e     Example_F28377xLaunchPadDemo.obj (.text)
-                  00083ec4    00000107     rts2800_fpu32.lib : ll_div.obj (.text)
-                  00083fcb    00000034                       : printf.obj (.text)
-                  00083fff    00000001                       : startup.obj (.text)
+                  000834c9    000002cd     LAUNCHXL-F28377S-Test.obj (.text)
+                  00083796    0000027c     rts2800_fpu32.lib : trgdrv.obj (.text)
+                  00083a12    00000244     F2837xS_Gpio.obj (.text)
+                  00083c56    0000021b     rts2800_fpu32.lib : lowlev.obj (.text)
+                  00083e71    00000107                       : ll_div.obj (.text)
+                  00083f78    00000083                       : fd_mpy.obj (.text)
+                  00083ffb    00000005                       : strcpy.obj (.text)
 
-.text.2    0    00084000    00000c34     
-                  00084000    000000f9     rts2800_fpu32.lib : fopen.obj (.text)
-                  000840f9    000000dd     F2837xS_Adc.obj (.text)
-                  000841d6    000000bc     rts2800_fpu32.lib : s_scalbn.obj (.text)
-                  00084292    000000b0                       : fputs.obj (.text)
-                  00084342    0000009c                       : fd_add.obj (.text)
-                  000843de    00000094                       : trgmsg.obj (.text)
-                  00084472    0000008b                       : fd_div.obj (.text)
-                  000844fd    00000089                       : setvbuf.obj (.text)
-                  00084586    00000083                       : fd_mpy.obj (.text)
-                  00084609    00000073                       : fflush.obj (.text)
-                  0008467c    0000006b     sci_io.obj (.text)
-                  000846e7    00000067     rts2800_fpu32.lib : _io_perm.obj (.text)
-                  0008474e    0000005f                       : fclose.obj (.text)
-                  000847ad    0000005b                       : s_frexp.obj (.text)
-                  00084808    00000056                       : boot.obj (.text)
-                  0008485e    00000053                       : fputc.obj (.text)
-                  000848b1    00000046                       : cpy_tbl.obj (.text)
-                  000848f7    0000003d                       : fseek.obj (.text)
-                  00084934    00000031                       : atoi.obj (.text)
-                  00084965    0000002e                       : ltoa.obj (.text)
-                  00084993    0000002a                       : fd_cmp.obj (.text)
-                  000849bd    0000002a                       : l_div.obj (.text)
-                  000849e7    00000029                       : exit.obj (.text)
-                  00084a10    00000028     F2837xS_PieCtrl.obj (.text)
-                  00084a38    00000026     F2837xS_PieVect.obj (.text)
-                  00084a5e    00000022     rts2800_fpu32.lib : s_copysign.obj (.text)
-                  00084a80    00000021                       : fd_toi.obj (.text)
-                  00084aa1    0000001f                       : fd_tol.obj (.text)
-                  00084ac0    0000001e                       : ll_cmp.obj (.text)
-                  00084ade    0000001e                       : memcpy.obj (.text)
-                  00084afc    0000001e                       : strncpy.obj (.text)
-                  00084b1a    0000001d                       : i_tofd.obj (.text)
-                  00084b37    0000001c                       : fs_tofd.obj (.text)
-                  00084b53    0000001c                       : l_tofd.obj (.text)
-                  00084b6f    0000001a                       : cpy_utils.obj (.text)
-                  00084b89    00000019                       : args_main.obj (.text)
-                  00084ba2    00000018                       : ll_aox.obj (.text)
-                  00084bba    00000011                       : memchr.obj (.text)
-                  00084bcb    0000000e                       : fd_sub.obj (.text)
-                  00084bd9    0000000d                       : memccpy.obj (.text)
-                  00084be6    0000000c                       : memset.obj (.text)
-                  00084bf2    0000000c                       : strchr.obj (.text)
-                  00084bfe    0000000a                       : strcmp.obj (.text)
-                  00084c08    00000009                       : _lock.obj (.text)
-                  00084c11    00000009                       : fd_neg.obj (.text)
-                  00084c1a    00000008     F2837xS_CodeStartBranch.obj (.text)
-                  00084c22    00000008     rts2800_fpu32.lib : strlen.obj (.text)
-                  00084c2a    00000005                       : strcpy.obj (.text)
-                  00084c2f    00000003                       : remove.obj (.text)
-                  00084c32    00000002                       : pre_init.obj (.text)
+.text.2    0    00084000    00000db3     
+                  00084000    000001d2     rts2800_fpu32.lib : memory.obj (.text)
+                  000841d2    000000f9                       : fopen.obj (.text)
+                  000842cb    000000dd     F2837xS_Adc.obj (.text)
+                  000843a8    000000bc     rts2800_fpu32.lib : s_scalbn.obj (.text)
+                  00084464    000000b0                       : fputs.obj (.text)
+                  00084514    0000009c                       : fd_add.obj (.text)
+                  000845b0    00000094                       : trgmsg.obj (.text)
+                  00084644    0000008b                       : fd_div.obj (.text)
+                  000846cf    00000089                       : setvbuf.obj (.text)
+                  00084758    00000073                       : fflush.obj (.text)
+                  000847cb    0000006b     sci_io.obj (.text)
+                  00084836    00000067     rts2800_fpu32.lib : _io_perm.obj (.text)
+                  0008489d    0000005f                       : fclose.obj (.text)
+                  000848fc    0000005b                       : s_frexp.obj (.text)
+                  00084957    00000056                       : boot.obj (.text)
+                  000849ad    00000053                       : fputc.obj (.text)
+                  00084a00    00000046                       : cpy_tbl.obj (.text)
+                  00084a46    0000003d                       : fseek.obj (.text)
+                  00084a83    00000034                       : printf.obj (.text)
+                  00084ab7    00000031                       : atoi.obj (.text)
+                  00084ae8    0000002e                       : ltoa.obj (.text)
+                  00084b16    0000002a                       : fd_cmp.obj (.text)
+                  00084b40    0000002a                       : l_div.obj (.text)
+                  00084b6a    00000029                       : exit.obj (.text)
+                  00084b93    00000028     F2837xS_PieCtrl.obj (.text)
+                  00084bbb    00000026     F2837xS_PieVect.obj (.text)
+                  00084be1    00000022     rts2800_fpu32.lib : s_copysign.obj (.text)
+                  00084c03    00000021                       : fd_toi.obj (.text)
+                  00084c24    0000001f                       : fd_tol.obj (.text)
+                  00084c43    0000001e                       : ll_cmp.obj (.text)
+                  00084c61    0000001e                       : memcpy.obj (.text)
+                  00084c7f    0000001e                       : strncpy.obj (.text)
+                  00084c9d    0000001d                       : i_tofd.obj (.text)
+                  00084cba    0000001c                       : fs_tofd.obj (.text)
+                  00084cd6    0000001c                       : l_tofd.obj (.text)
+                  00084cf2    0000001a                       : cpy_utils.obj (.text)
+                  00084d0c    00000019                       : args_main.obj (.text)
+                  00084d25    00000018                       : ll_aox.obj (.text)
+                  00084d3d    00000011                       : memchr.obj (.text)
+                  00084d4e    0000000e                       : fd_sub.obj (.text)
+                  00084d5c    0000000d                       : memccpy.obj (.text)
+                  00084d69    0000000c                       : memset.obj (.text)
+                  00084d75    0000000c                       : strchr.obj (.text)
+                  00084d81    0000000a                       : strcmp.obj (.text)
+                  00084d8b    00000009                       : _lock.obj (.text)
+                  00084d94    00000009                       : fd_neg.obj (.text)
+                  00084d9d    00000008     F2837xS_CodeStartBranch.obj (.text)
+                  00084da5    00000008     rts2800_fpu32.lib : strlen.obj (.text)
+                  00084dad    00000003                       : remove.obj (.text)
+                  00084db0    00000002                       : pre_init.obj (.text)
+                  00084db2    00000001                       : startup.obj (.text)
 
-.econst    0    00090000    00000374     
+.econst    0    00090000    0000047a     
                   00090000    000001c0     F2837xS_PieVect.obj (.econst:_PieVectTableInit)
-                  000901c0    00000101     rts2800_fpu32.lib : ctype.obj (.econst:.string:__ctypes_)
-                  000902c1    00000001     --HOLE-- [fill = 0]
-                  000902c2    0000004a     Example_F28377xLaunchPadDemo.obj (.econst:.string)
-                  0009030c    00000026     rts2800_fpu32.lib : _printfi.obj (.econst:.string)
-                  00090332    0000001c                       : _printfi.obj (.econst)
-                  0009034e    0000001c                       : s_scalbn.obj (.econst)
-                  0009036a    00000008                       : s_frexp.obj (.econst)
-                  00090372    00000002                       : fputs.obj (.econst:.string)
+                  000901c0    00000150     LAUNCHXL-F28377S-Test.obj (.econst:.string)
+                  00090310    00000101     rts2800_fpu32.lib : ctype.obj (.econst:.string:__ctypes_)
+                  00090411    00000001     --HOLE-- [fill = 0]
+                  00090412    00000026                       : _printfi.obj (.econst:.string)
+                  00090438    0000001c                       : _printfi.obj (.econst)
+                  00090454    0000001c                       : s_scalbn.obj (.econst)
+                  00090470    00000008                       : s_frexp.obj (.econst)
+                  00090478    00000002                       : fputs.obj (.econst:.string)
 
 AdcaResultFile 
 *          1    00000b00    00000018     UNINITIALIZED
@@ -584,7 +584,7 @@ GpioDataRegsFile
                   0000aeb4    00000001     sci_io.obj (.ebss)
 
 .ebss.2    1    0000aec0    00000140     UNINITIALIZED
-                  0000aec0    00000140     Example_F28377xLaunchPadDemo.obj (.ebss)
+                  0000aec0    00000140     LAUNCHXL-F28377S-Test.obj (.ebss)
 
 .ebss.3    1    0000c000    00000088     UNINITIALIZED
                   0000c000    00000088     rts2800_fpu32.lib : lowlev.obj (.ebss)
@@ -687,87 +687,87 @@ DcsmZ2OtpFile
 
 MODULE SUMMARY
 
-       Module                             code    ro data   rw data
-       ------                             ----    -------   -------
+       Module                           code    ro data   rw data
+       ------                           ----    -------   -------
     .\
-       F2837xS_GlobalVariableDefs.obj     0       0         8437   
-       F2837xS_DefaultISR.obj             1413    0         0      
-       F2837xS_SysCtrl.obj                947     0         0      
-       Example_F28377xLaunchPadDemo.obj   334     0         406    
-       F2837xS_Gpio.obj                   580     0         0      
-       F2837xS_PieVect.obj                38      0         448    
-       F2837xS_Adc.obj                    221     0         0      
-       sci_io.obj                         107     0         5      
-       F2837xS_PieCtrl.obj                40      0         0      
-       F2837xS_CpuTimers.obj              0       0         24     
-       F2837xS_CodeStartBranch.obj        10      0         0      
-       F2837xS_usDelay.obj                8       0         0      
-    +--+----------------------------------+-------+---------+---------+
-       Total:                             3698    0         9320   
-                                                                   
+       F2837xS_GlobalVariableDefs.obj   0       0         8437   
+       F2837xS_DefaultISR.obj           1413    0         0      
+       LAUNCHXL-F28377S-Test.obj        717     0         668    
+       F2837xS_SysCtrl.obj              947     0         0      
+       F2837xS_Gpio.obj                 580     0         0      
+       F2837xS_PieVect.obj              38      0         448    
+       F2837xS_Adc.obj                  221     0         0      
+       sci_io.obj                       107     0         5      
+       F2837xS_PieCtrl.obj              40      0         0      
+       F2837xS_CpuTimers.obj            0       0         24     
+       F2837xS_CodeStartBranch.obj      10      0         0      
+       F2837xS_usDelay.obj              8       0         0      
+    +--+--------------------------------+-------+---------+---------+
+       Total:                           4081    0         9582   
+                                                                 
     C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/lib/rts2800_fpu32.lib
-       _printfi.obj                       3033    0         66     
-       lowlev.obj                         539     0         185    
-       trgdrv.obj                         636     0         8      
-       memory.obj                         466     0         12     
-       trgmsg.obj                         148     0         288    
-       defs.obj                           0       0         394    
-       ll_div.obj                         263     0         0      
-       ctype.obj                          0       0         257    
-       fopen.obj                          249     0         5      
-       s_scalbn.obj                       188     0         28     
-       fputs.obj                          176     0         2      
-       fd_add.obj                         156     0         0      
-       fd_div.obj                         139     0         0      
-       setvbuf.obj                        137     0         0      
-       fd_mpy.obj                         131     0         0      
-       fflush.obj                         115     0         0      
-       _io_perm.obj                       103     0         0      
-       s_frexp.obj                        91      0         8      
-       fclose.obj                         95      0         0      
-       boot.obj                           86      0         0      
-       fputc.obj                          83      0         0      
-       cpy_tbl.obj                        70      0         0      
-       exit.obj                           41      0         20     
-       fseek.obj                          61      0         0      
-       printf.obj                         52      0         0      
-       atoi.obj                           49      0         0      
-       ltoa.obj                           46      0         0      
-       fd_cmp.obj                         42      0         0      
-       l_div.obj                          42      0         0      
-       s_copysign.obj                     34      0         0      
-       fd_toi.obj                         33      0         0      
-       fd_tol.obj                         31      0         0      
-       ll_cmp.obj                         30      0         0      
-       memcpy.obj                         30      0         0      
-       strncpy.obj                        30      0         0      
-       i_tofd.obj                         29      0         0      
-       fs_tofd.obj                        28      0         0      
-       l_tofd.obj                         28      0         0      
-       cpy_utils.obj                      26      0         0      
-       args_main.obj                      25      0         0      
-       ll_aox.obj                         24      0         0      
-       _lock.obj                          9       0         14     
-       memchr.obj                         17      0         0      
-       fd_sub.obj                         14      0         0      
-       memccpy.obj                        13      0         0      
-       memset.obj                         12      0         0      
-       strchr.obj                         12      0         0      
-       strcmp.obj                         10      0         0      
-       fd_neg.obj                         9       0         0      
-       strlen.obj                         8       0         0      
-       errno.obj                          0       0         5      
-       strcpy.obj                         5       0         0      
-       remove.obj                         3       0         0      
-       pre_init.obj                       2       0         0      
-       startup.obj                        1       0         0      
-    +--+----------------------------------+-------+---------+---------+
-       Total:                             7700    0         1292   
-                                                                   
-       Heap:                              0       0         1024   
-       Stack:                             0       0         512    
-    +--+----------------------------------+-------+---------+---------+
-       Grand Total:                       11398   0         12148  
+       _printfi.obj                     3033    0         66     
+       lowlev.obj                       539     0         185    
+       trgdrv.obj                       636     0         8      
+       memory.obj                       466     0         12     
+       trgmsg.obj                       148     0         288    
+       defs.obj                         0       0         394    
+       ll_div.obj                       263     0         0      
+       ctype.obj                        0       0         257    
+       fopen.obj                        249     0         5      
+       s_scalbn.obj                     188     0         28     
+       fputs.obj                        176     0         2      
+       fd_add.obj                       156     0         0      
+       fd_div.obj                       139     0         0      
+       setvbuf.obj                      137     0         0      
+       fd_mpy.obj                       131     0         0      
+       fflush.obj                       115     0         0      
+       _io_perm.obj                     103     0         0      
+       s_frexp.obj                      91      0         8      
+       fclose.obj                       95      0         0      
+       boot.obj                         86      0         0      
+       fputc.obj                        83      0         0      
+       cpy_tbl.obj                      70      0         0      
+       exit.obj                         41      0         20     
+       fseek.obj                        61      0         0      
+       printf.obj                       52      0         0      
+       atoi.obj                         49      0         0      
+       ltoa.obj                         46      0         0      
+       fd_cmp.obj                       42      0         0      
+       l_div.obj                        42      0         0      
+       s_copysign.obj                   34      0         0      
+       fd_toi.obj                       33      0         0      
+       fd_tol.obj                       31      0         0      
+       ll_cmp.obj                       30      0         0      
+       memcpy.obj                       30      0         0      
+       strncpy.obj                      30      0         0      
+       i_tofd.obj                       29      0         0      
+       fs_tofd.obj                      28      0         0      
+       l_tofd.obj                       28      0         0      
+       cpy_utils.obj                    26      0         0      
+       args_main.obj                    25      0         0      
+       ll_aox.obj                       24      0         0      
+       _lock.obj                        9       0         14     
+       memchr.obj                       17      0         0      
+       fd_sub.obj                       14      0         0      
+       memccpy.obj                      13      0         0      
+       memset.obj                       12      0         0      
+       strchr.obj                       12      0         0      
+       strcmp.obj                       10      0         0      
+       fd_neg.obj                       9       0         0      
+       strlen.obj                       8       0         0      
+       errno.obj                        0       0         5      
+       strcpy.obj                       5       0         0      
+       remove.obj                       3       0         0      
+       pre_init.obj                     2       0         0      
+       startup.obj                      1       0         0      
+    +--+--------------------------------+-------+---------+---------+
+       Total:                           7700    0         1292   
+                                                                 
+       Heap:                            0       0         1024   
+       Stack:                           0       0         512    
+    +--+--------------------------------+-------+---------+---------+
+       Grand Total:                     11781   0         12410  
 
 
 GLOBAL DATA SYMBOLS: SORTED BY DATA PAGE
@@ -925,10 +925,10 @@ address     data page           name
 0000aeb2     2ba (0000ae80)     _errno
 0000aeb4     2ba (0000ae80)     _deviceOpen
 
-0000aec0     2bb (0000aec0)     _blueLED_state
-0000aec1     2bb (0000aec0)     _redLED_state
-0000aec2     2bb (0000aec0)     _resultsIndex
-0000aec3     2bb (0000aec0)     _status
+0000aec0     2bb (0000aec0)     _status
+0000aec1     2bb (0000aec0)     _blueLED_state
+0000aec2     2bb (0000aec0)     _redLED_state
+0000aec3     2bb (0000aec0)     _resultsIndex
 0000aec4     2bb (0000aec0)     _fid
 
 0000af00     2bc (0000af00)     _AdcaResults
@@ -979,7 +979,7 @@ address     data page           name
 
 00090000    2400 (00090000)     _PieVectTableInit
 
-000901c0    2407 (000901c0)     __ctypes_
+00090310    240c (00090300)     __ctypes_
 
 
 GLOBAL SYMBOLS: SORTED ALPHABETICALLY BY Name 
@@ -987,32 +987,32 @@ GLOBAL SYMBOLS: SORTED ALPHABETICALLY BY Name
 page  address   name                                  
 ----  -------   ----                                  
 abs   ffffffff  .text                                 
-0     000849e7  C$$EXIT                               
-0     00084431  C$$IO$$                               
-0     00084342  FD$$ADD                               
-0     00084993  FD$$CMP                               
-0     00084472  FD$$DIV                               
-0     00084586  FD$$MPY                               
-0     00084c11  FD$$NEG                               
-0     00084bcb  FD$$SUB                               
-0     00084a80  FD$$TOI                               
-0     00084aa1  FD$$TOL                               
-0     00084b37  FS$$TOFD                              
-0     00084b1a  I$$TOFD                               
-0     000849bd  L$$DIV                                
-0     000849cc  L$$MOD                                
-0     00084b53  L$$TOFD                               
-0     00084ba2  LL$$AND                               
-0     00084ac0  LL$$CMP                               
-0     00083ec4  LL$$DIV                               
-0     00083f00  LL$$MOD                               
-0     00084baa  LL$$OR                                
-0     00084bb2  LL$$XOR                               
-0     000849da  UL$$DIV                               
-0     000849e1  UL$$MOD                               
-0     00084ad2  ULL$$CMP                              
-0     00083f3a  ULL$$DIV                              
-0     00083f69  ULL$$MOD                              
+0     00084b6a  C$$EXIT                               
+0     00084603  C$$IO$$                               
+0     00084514  FD$$ADD                               
+0     00084b16  FD$$CMP                               
+0     00084644  FD$$DIV                               
+0     00083f78  FD$$MPY                               
+0     00084d94  FD$$NEG                               
+0     00084d4e  FD$$SUB                               
+0     00084c03  FD$$TOI                               
+0     00084c24  FD$$TOL                               
+0     00084cba  FS$$TOFD                              
+0     00084c9d  I$$TOFD                               
+0     00084b40  L$$DIV                                
+0     00084b4f  L$$MOD                                
+0     00084cd6  L$$TOFD                               
+0     00084d25  LL$$AND                               
+0     00084c43  LL$$CMP                               
+0     00083e71  LL$$DIV                               
+0     00083ead  LL$$MOD                               
+0     00084d2d  LL$$OR                                
+0     00084d35  LL$$XOR                               
+0     00084b5d  UL$$DIV                               
+0     00084b64  UL$$MOD                               
+0     00084c55  ULL$$CMP                              
+0     00083ee7  ULL$$DIV                              
+0     00083f16  ULL$$MOD                              
 0     00082d2b  _ADCA1_ISR                            
 0     00082fab  _ADCA2_ISR                            
 0     00082fb5  _ADCA3_ISR                            
@@ -1035,7 +1035,7 @@ abs   ffffffff  .text
 0     00083159  _ADCD_EVT_ISR                         
 0     000831b3  _AUX_PLL_SLIP_ISR                     
 1     0005f4c0  _AccessProtectionRegs                 
-0     000840f9  _AdcSetMode                           
+0     000842cb  _AdcSetMode                           
 1     00007400  _AdcaRegs                             
 1     00000b00  _AdcaResultRegs                       
 1     0000af00  _AdcaResults                          
@@ -1063,7 +1063,7 @@ abs   ffffffff  .text
 0     00083037  _CLA1_8_ISR                           
 0     000831bd  _CLA_OVERFLOW_ISR                     
 0     000831c7  _CLA_UNDERFLOW_ISR                    
-0     0008419c  _CalAdcINL                            
+0     0008436e  _CalAdcINL                            
 1     00001400  _Cla1Regs                             
 0     00000ce0  _Cla1SoftIntRegs                      
 1     0005d200  _ClkCfgRegs                           
@@ -1167,7 +1167,7 @@ abs   ffffffff  .text
 1     00047800  _Emif2Regs                            
 1     00000d01  _EmuBMode                             
 1     00000d00  _EmuKey                               
-0     00084a2f  _EnableInterrupts                     
+0     00084bb2  _EnableInterrupts                     
 0     0000806e  _F28x_usDelay                         
 0     00083195  _FLASH_CORRECTABLE_ERROR_ISR          
 0     00083069  _FPU_OVERFLOW_ISR                     
@@ -1179,34 +1179,34 @@ abs   ffffffff  .text
 0     00008052  _FlashOff_Bank0                       
 0     00008060  _FlashOff_Bank1                       
 1     00050024  _FlashPumpSemaphoreRegs               
-0     0008393e  _GPIO_EnableUnbondedIOPullups         
-0     00083919  _GPIO_EnableUnbondedIOPullupsFor100Pin
-0     00083900  _GPIO_EnableUnbondedIOPullupsFor176Pin
-0     00083954  _GPIO_ReadPin                         
-0     000838a5  _GPIO_SetupLock                       
-0     00083785  _GPIO_SetupPinMux                     
-0     00083811  _GPIO_SetupPinOptions                 
-0     000838ce  _GPIO_SetupXINT1Gpio                  
-0     000838d8  _GPIO_SetupXINT2Gpio                  
-0     000838e2  _GPIO_SetupXINT3Gpio                  
-0     000838ec  _GPIO_SetupXINT4Gpio                  
-0     000838f6  _GPIO_SetupXINT5Gpio                  
-0     0008396b  _GPIO_WritePin                        
+0     00083c0b  _GPIO_EnableUnbondedIOPullups         
+0     00083be6  _GPIO_EnableUnbondedIOPullupsFor100Pin
+0     00083bcd  _GPIO_EnableUnbondedIOPullupsFor176Pin
+0     00083c21  _GPIO_ReadPin                         
+0     00083b72  _GPIO_SetupLock                       
+0     00083a52  _GPIO_SetupPinMux                     
+0     00083ade  _GPIO_SetupPinOptions                 
+0     00083b9b  _GPIO_SetupXINT1Gpio                  
+0     00083ba5  _GPIO_SetupXINT2Gpio                  
+0     00083baf  _GPIO_SetupXINT3Gpio                  
+0     00083bb9  _GPIO_SetupXINT4Gpio                  
+0     00083bc3  _GPIO_SetupXINT5Gpio                  
+0     00083c38  _GPIO_WritePin                        
 1     00007c00  _GpioCtrlRegs                         
 1     00007f00  _GpioDataRegs                         
 0     000834a4  _HALT                                 
 0     000834b5  _HIB                                  
-0     0008370f  _HOSTclock                            
-0     000836e6  _HOSTclose                            
-0     000836be  _HOSTgetenv                           
-0     0008365d  _HOSTlseek                            
-0     0008361d  _HOSTopen                             
-0     000835de  _HOSTread                             
-0     000835a0  _HOSTrename                           
-0     0008356a  _HOSTtime                             
-0     00083525  _HOSTtime64                           
-0     00083501  _HOSTunlink                           
-0     000834c9  _HOSTwrite                            
+0     000839dc  _HOSTclock                            
+0     000839b3  _HOSTclose                            
+0     0008398b  _HOSTgetenv                           
+0     0008392a  _HOSTlseek                            
+0     000838ea  _HOSTopen                             
+0     000838ab  _HOSTread                             
+0     0008386d  _HOSTrename                           
+0     00083837  _HOSTtime                             
+0     000837f2  _HOSTtime64                           
+0     000837ce  _HOSTunlink                           
+0     00083796  _HOSTwrite                            
 0     00082f0b  _I2CA_FIFO_ISR                        
 0     00082f01  _I2CA_ISR                             
 0     00082f1f  _I2CB_FIFO_ISR                        
@@ -1222,10 +1222,10 @@ abs   ffffffff  .text
 0     00083398  _InitAuxPll                           
 0     00008000  _InitFlash_Bank0                      
 0     00008029  _InitFlash_Bank1                      
-0     00083745  _InitGpio                             
+0     00083a12  _InitGpio                             
 0     0008322f  _InitPeripheralClocks                 
-0     00084a10  _InitPieCtrl                          
-0     00084a38  _InitPieVectTable                     
+0     00084b93  _InitPieCtrl                          
+0     00084bbb  _InitPieVectTable                     
 0     000831f2  _InitSysCtrl                          
 0     0008330f  _InitSysPll                           
 1     00007900  _InputXbarRegs                        
@@ -1265,13 +1265,13 @@ abs   00000072  _RamfuncsRunSize
 0     00082f33  _SCIC_TX_ISR                          
 0     00082f3d  _SCID_RX_ISR                          
 0     00082f47  _SCID_TX_ISR                          
-0     0008468c  _SCI_close                            
-0     000846d5  _SCI_lseek                            
-0     0008467c  _SCI_open                             
-0     0008469b  _SCI_read                             
-0     000846e1  _SCI_rename                           
-0     000846dc  _SCI_unlink                           
-0     000846b7  _SCI_write                            
+0     000847db  _SCI_close                            
+0     00084824  _SCI_lseek                            
+0     000847cb  _SCI_open                             
+0     000847ea  _SCI_read                             
+0     00084830  _SCI_rename                           
+0     0008482b  _SCI_unlink                           
+0     00084806  _SCI_write                            
 0     000830f5  _SD1_ISR                              
 0     000830ff  _SD2_ISR                              
 0     00082e75  _SPIA_RX_ISR                          
@@ -1330,10 +1330,10 @@ abs   00000072  _RamfuncsRunSize
 1     00000600  __STACK_END                           
 abs   00000200  __STACK_SIZE                          
 abs   00000400  __SYSMEM_SIZE                         
-0     00084078  ___TI_cleanup                         
+0     0008424a  ___TI_cleanup                         
 1     0000aeaa  ___TI_cleanup_ptr                     
-0     0008474e  ___TI_closefile                       
-0     00084609  ___TI_doflush                         
+0     0008489d  ___TI_closefile                       
+0     00084758  ___TI_doflush                         
 1     0000aeac  ___TI_dtors_ptr                       
 1     0000aea8  ___TI_enable_exit_profile_output      
 1     0000ad40  ___TI_ft_end                          
@@ -1341,92 +1341,95 @@ abs   ffffffff  ___TI_pprof_out_hndl
 0     00082b48  ___TI_printfi                         
 abs   ffffffff  ___TI_prof_data_size                  
 abs   ffffffff  ___TI_prof_data_start                 
-0     00084722  ___TI_rd_ok                           
-0     00084436  ___TI_readmsg                         
+0     00084871  ___TI_rd_ok                           
+0     00084608  ___TI_readmsg                         
 1     0000ae00  ___TI_tmpnams                         
-0     000843de  ___TI_writemsg                        
-0     000846e7  ___TI_wrt_ok                          
+0     000845b0  ___TI_writemsg                        
+0     00084836  ___TI_wrt_ok                          
 abs   ffffffff  ___binit__                            
 abs   ffffffff  ___c_args__                           
 0     00082000  ___cinit__                            
 abs   ffffffff  ___etext__                            
 abs   ffffffff  ___pinit__                            
 abs   ffffffff  ___text__                             
-0     00084b89  __args_main                           
-0     000901c0  __ctypes_                             
+0     00084d0c  __args_main                           
+0     00090310  __ctypes_                             
 1     0000ad80  __ftable                              
 1     0000aeae  __lock                                
-0     00084c10  __nop                                 
-0     00084c0c  __register_lock                       
-0     00084c08  __register_unlock                     
+0     00084d93  __nop                                 
+0     00084d8f  __register_lock                       
+0     00084d8b  __register_unlock                     
 1     00000400  __stack                               
 1     0000a800  __sys_memory                          
-0     00083fff  __system_post_cinit                   
-0     00084c32  __system_pre_init                     
+0     00084db2  __system_post_cinit                   
+0     00084db0  __system_pre_init                     
 1     0000aeb0  __unlock                              
-0     000849e7  _abort                                
-0     00083b26  _add_device                           
-0     00084934  _atoi                                 
-1     0000aec0  _blueLED_state                        
-0     00084808  _c_int00                              
-0     00083d5f  _calloc                               
-0     00083d5d  _chkheap                              
-0     00083af3  _close                                
-0     000848b1  _copy_in                              
-0     00084a5e  _copysignl                            
-0     00084b6f  _ddcopy                               
+0     00084b6a  _abort                                
+0     00083df3  _add_device                           
+0     00084ab7  _atoi                                 
+1     0000aec1  _blueLED_state                        
+0     00084957  _c_int00                              
+0     000841bb  _calloc                               
+0     000841b9  _chkheap                              
+0     00083dc0  _close                                
+0     00083609  _configureADC                         
+0     00083598  _configureLEDs                        
+0     000835b5  _configureSCIprintf                   
+0     00084a00  _copy_in                              
+0     00084be1  _copysignl                            
+0     00084cf2  _ddcopy                               
 1     0000aeb4  _deviceOpen                           
-0     00084b6f  _dpcopy                               
+0     00084cf2  _dpcopy                               
 1     0000aeb2  _errno                                
-0     000849e9  _exit                                 
-0     00084792  _fclose                               
-0     00084638  _fflush                               
+0     00084b6c  _exit                                 
+0     000848e1  _fclose                               
+0     00084787  _fflush                               
 1     0000aec4  _fid                                  
-0     000840b3  _fopen                                
-0     0008485e  _fputc                                
-0     00084292  _fputs                                
-0     00083ba4  _free                                 
-0     00083d3f  _free_memory                          
-0     00084095  _freopen                              
-0     000847ad  _frexpl                               
-0     000848f7  _fseek                                
-0     000841d6  _ldexpl                               
-0     00083adb  _lseek                                
-0     00084965  _ltoa                                 
-0     00083da8  _main                                 
-0     00083c0d  _malloc                               
-0     00083d1d  _max_free                             
-0     00084bd9  _memccpy                              
-0     00084bba  _memchr                               
-0     00084ade  _memcpy                               
-0     00084be6  _memset                               
-0     00083be8  _minit                                
-0     00083a6a  _open                                 
-0     00084b6f  _pdcopy                               
-0     00084b6f  _ppcopy                               
-0     00083fd1  _printf                               
-0     0008485e  _putc                                 
-0     000848ac  _putchar                              
-0     0008432f  _puts                                 
-0     00083a51  _read                                 
-0     00083c6b  _realloc                              
-1     0000aec1  _redLED_state                         
-0     00084c2f  _remove                               
-0     00083a37  _remove_device                        
-0     00083a09  _rename                               
-1     0000aec2  _resultsIndex                         
-0     00083d76  _sampleADC                            
-0     000841d6  _scalbnl                              
-0     00083d98  _scia_init                            
-0     000844fd  _setvbuf                              
-1     0000aec3  _status                               
-0     00084bf2  _strchr                               
-0     00084bfe  _strcmp                               
-0     00084c2a  _strcpy                               
-0     00084c22  _strlen                               
-0     00084afc  _strncpy                              
-0     000839f0  _unlink                               
-0     00083989  _write                                
+0     00084285  _fopen                                
+0     000849ad  _fputc                                
+0     00084464  _fputs                                
+0     00084000  _free                                 
+0     0008419b  _free_memory                          
+0     00084267  _freopen                              
+0     000848fc  _frexpl                               
+0     00084a46  _fseek                                
+0     000843a8  _ldexpl                               
+0     00083da8  _lseek                                
+0     00084ae8  _ltoa                                 
+0     000834c9  _main                                 
+0     00084069  _malloc                               
+0     00084179  _max_free                             
+0     00084d5c  _memccpy                              
+0     00084d3d  _memchr                               
+0     00084c61  _memcpy                               
+0     00084d69  _memset                               
+0     00084044  _minit                                
+0     00083d37  _open                                 
+0     00084cf2  _pdcopy                               
+0     00084cf2  _ppcopy                               
+0     00084a89  _printf                               
+0     000849ad  _putc                                 
+0     000849fb  _putchar                              
+0     00084501  _puts                                 
+0     00083d1e  _read                                 
+0     000840c7  _realloc                              
+1     0000aec2  _redLED_state                         
+0     00084dad  _remove                               
+0     00083d04  _remove_device                        
+0     00083cd6  _rename                               
+1     0000aec3  _resultsIndex                         
+0     00083712  _sampleADC                            
+0     000843a8  _scalbnl                              
+0     00083588  _scia_init                            
+0     000846cf  _setvbuf                              
+1     0000aec0  _status                               
+0     00084d75  _strchr                               
+0     00084d81  _strcmp                               
+0     00083ffb  _strcpy                               
+0     00084da5  _strlen                               
+0     00084c7f  _strncpy                              
+0     00083cbd  _unlink                               
+0     00083c56  _write                                
 abs   ffffffff  binit                                 
 0     00082000  cinit                                 
 0     00080000  code_start                            
@@ -1612,142 +1615,145 @@ page  address   name
 0     00083499  _STANDBY                              
 0     000834a4  _HALT                                 
 0     000834b5  _HIB                                  
-0     000834c9  _HOSTwrite                            
-0     00083501  _HOSTunlink                           
-0     00083525  _HOSTtime64                           
-0     0008356a  _HOSTtime                             
-0     000835a0  _HOSTrename                           
-0     000835de  _HOSTread                             
-0     0008361d  _HOSTopen                             
-0     0008365d  _HOSTlseek                            
-0     000836be  _HOSTgetenv                           
-0     000836e6  _HOSTclose                            
-0     0008370f  _HOSTclock                            
-0     00083745  _InitGpio                             
-0     00083785  _GPIO_SetupPinMux                     
-0     00083811  _GPIO_SetupPinOptions                 
-0     000838a5  _GPIO_SetupLock                       
-0     000838ce  _GPIO_SetupXINT1Gpio                  
-0     000838d8  _GPIO_SetupXINT2Gpio                  
-0     000838e2  _GPIO_SetupXINT3Gpio                  
-0     000838ec  _GPIO_SetupXINT4Gpio                  
-0     000838f6  _GPIO_SetupXINT5Gpio                  
-0     00083900  _GPIO_EnableUnbondedIOPullupsFor176Pin
-0     00083919  _GPIO_EnableUnbondedIOPullupsFor100Pin
-0     0008393e  _GPIO_EnableUnbondedIOPullups         
-0     00083954  _GPIO_ReadPin                         
-0     0008396b  _GPIO_WritePin                        
-0     00083989  _write                                
-0     000839f0  _unlink                               
-0     00083a09  _rename                               
-0     00083a37  _remove_device                        
-0     00083a51  _read                                 
-0     00083a6a  _open                                 
-0     00083adb  _lseek                                
-0     00083af3  _close                                
-0     00083b26  _add_device                           
-0     00083ba4  _free                                 
-0     00083be8  _minit                                
-0     00083c0d  _malloc                               
-0     00083c6b  _realloc                              
-0     00083d1d  _max_free                             
-0     00083d3f  _free_memory                          
-0     00083d5d  _chkheap                              
-0     00083d5f  _calloc                               
-0     00083d76  _sampleADC                            
-0     00083d98  _scia_init                            
-0     00083da8  _main                                 
-0     00083ec4  LL$$DIV                               
-0     00083f00  LL$$MOD                               
-0     00083f3a  ULL$$DIV                              
-0     00083f69  ULL$$MOD                              
-0     00083fd1  _printf                               
-0     00083fff  __system_post_cinit                   
-0     00084078  ___TI_cleanup                         
-0     00084095  _freopen                              
-0     000840b3  _fopen                                
-0     000840f9  _AdcSetMode                           
-0     0008419c  _CalAdcINL                            
-0     000841d6  _ldexpl                               
-0     000841d6  _scalbnl                              
-0     00084292  _fputs                                
-0     0008432f  _puts                                 
-0     00084342  FD$$ADD                               
-0     000843de  ___TI_writemsg                        
-0     00084431  C$$IO$$                               
-0     00084436  ___TI_readmsg                         
-0     00084472  FD$$DIV                               
-0     000844fd  _setvbuf                              
-0     00084586  FD$$MPY                               
-0     00084609  ___TI_doflush                         
-0     00084638  _fflush                               
-0     0008467c  _SCI_open                             
-0     0008468c  _SCI_close                            
-0     0008469b  _SCI_read                             
-0     000846b7  _SCI_write                            
-0     000846d5  _SCI_lseek                            
-0     000846dc  _SCI_unlink                           
-0     000846e1  _SCI_rename                           
-0     000846e7  ___TI_wrt_ok                          
-0     00084722  ___TI_rd_ok                           
-0     0008474e  ___TI_closefile                       
-0     00084792  _fclose                               
-0     000847ad  _frexpl                               
-0     00084808  _c_int00                              
-0     0008485e  _fputc                                
-0     0008485e  _putc                                 
-0     000848ac  _putchar                              
-0     000848b1  _copy_in                              
-0     000848f7  _fseek                                
-0     00084934  _atoi                                 
-0     00084965  _ltoa                                 
-0     00084993  FD$$CMP                               
-0     000849bd  L$$DIV                                
-0     000849cc  L$$MOD                                
-0     000849da  UL$$DIV                               
-0     000849e1  UL$$MOD                               
-0     000849e7  C$$EXIT                               
-0     000849e7  _abort                                
-0     000849e9  _exit                                 
-0     00084a10  _InitPieCtrl                          
-0     00084a2f  _EnableInterrupts                     
-0     00084a38  _InitPieVectTable                     
-0     00084a5e  _copysignl                            
-0     00084a80  FD$$TOI                               
-0     00084aa1  FD$$TOL                               
-0     00084ac0  LL$$CMP                               
-0     00084ad2  ULL$$CMP                              
-0     00084ade  _memcpy                               
-0     00084afc  _strncpy                              
-0     00084b1a  I$$TOFD                               
-0     00084b37  FS$$TOFD                              
-0     00084b53  L$$TOFD                               
-0     00084b6f  _ddcopy                               
-0     00084b6f  _dpcopy                               
-0     00084b6f  _pdcopy                               
-0     00084b6f  _ppcopy                               
-0     00084b89  __args_main                           
-0     00084ba2  LL$$AND                               
-0     00084baa  LL$$OR                                
-0     00084bb2  LL$$XOR                               
-0     00084bba  _memchr                               
-0     00084bcb  FD$$SUB                               
-0     00084bd9  _memccpy                              
-0     00084be6  _memset                               
-0     00084bf2  _strchr                               
-0     00084bfe  _strcmp                               
-0     00084c08  __register_unlock                     
-0     00084c0c  __register_lock                       
-0     00084c10  __nop                                 
-0     00084c11  FD$$NEG                               
-0     00084c22  _strlen                               
-0     00084c2a  _strcpy                               
-0     00084c2f  _remove                               
-0     00084c32  __system_pre_init                     
+0     000834c9  _main                                 
+0     00083588  _scia_init                            
+0     00083598  _configureLEDs                        
+0     000835b5  _configureSCIprintf                   
+0     00083609  _configureADC                         
+0     00083712  _sampleADC                            
+0     00083796  _HOSTwrite                            
+0     000837ce  _HOSTunlink                           
+0     000837f2  _HOSTtime64                           
+0     00083837  _HOSTtime                             
+0     0008386d  _HOSTrename                           
+0     000838ab  _HOSTread                             
+0     000838ea  _HOSTopen                             
+0     0008392a  _HOSTlseek                            
+0     0008398b  _HOSTgetenv                           
+0     000839b3  _HOSTclose                            
+0     000839dc  _HOSTclock                            
+0     00083a12  _InitGpio                             
+0     00083a52  _GPIO_SetupPinMux                     
+0     00083ade  _GPIO_SetupPinOptions                 
+0     00083b72  _GPIO_SetupLock                       
+0     00083b9b  _GPIO_SetupXINT1Gpio                  
+0     00083ba5  _GPIO_SetupXINT2Gpio                  
+0     00083baf  _GPIO_SetupXINT3Gpio                  
+0     00083bb9  _GPIO_SetupXINT4Gpio                  
+0     00083bc3  _GPIO_SetupXINT5Gpio                  
+0     00083bcd  _GPIO_EnableUnbondedIOPullupsFor176Pin
+0     00083be6  _GPIO_EnableUnbondedIOPullupsFor100Pin
+0     00083c0b  _GPIO_EnableUnbondedIOPullups         
+0     00083c21  _GPIO_ReadPin                         
+0     00083c38  _GPIO_WritePin                        
+0     00083c56  _write                                
+0     00083cbd  _unlink                               
+0     00083cd6  _rename                               
+0     00083d04  _remove_device                        
+0     00083d1e  _read                                 
+0     00083d37  _open                                 
+0     00083da8  _lseek                                
+0     00083dc0  _close                                
+0     00083df3  _add_device                           
+0     00083e71  LL$$DIV                               
+0     00083ead  LL$$MOD                               
+0     00083ee7  ULL$$DIV                              
+0     00083f16  ULL$$MOD                              
+0     00083f78  FD$$MPY                               
+0     00083ffb  _strcpy                               
+0     00084000  _free                                 
+0     00084044  _minit                                
+0     00084069  _malloc                               
+0     000840c7  _realloc                              
+0     00084179  _max_free                             
+0     0008419b  _free_memory                          
+0     000841b9  _chkheap                              
+0     000841bb  _calloc                               
+0     0008424a  ___TI_cleanup                         
+0     00084267  _freopen                              
+0     00084285  _fopen                                
+0     000842cb  _AdcSetMode                           
+0     0008436e  _CalAdcINL                            
+0     000843a8  _ldexpl                               
+0     000843a8  _scalbnl                              
+0     00084464  _fputs                                
+0     00084501  _puts                                 
+0     00084514  FD$$ADD                               
+0     000845b0  ___TI_writemsg                        
+0     00084603  C$$IO$$                               
+0     00084608  ___TI_readmsg                         
+0     00084644  FD$$DIV                               
+0     000846cf  _setvbuf                              
+0     00084758  ___TI_doflush                         
+0     00084787  _fflush                               
+0     000847cb  _SCI_open                             
+0     000847db  _SCI_close                            
+0     000847ea  _SCI_read                             
+0     00084806  _SCI_write                            
+0     00084824  _SCI_lseek                            
+0     0008482b  _SCI_unlink                           
+0     00084830  _SCI_rename                           
+0     00084836  ___TI_wrt_ok                          
+0     00084871  ___TI_rd_ok                           
+0     0008489d  ___TI_closefile                       
+0     000848e1  _fclose                               
+0     000848fc  _frexpl                               
+0     00084957  _c_int00                              
+0     000849ad  _fputc                                
+0     000849ad  _putc                                 
+0     000849fb  _putchar                              
+0     00084a00  _copy_in                              
+0     00084a46  _fseek                                
+0     00084a89  _printf                               
+0     00084ab7  _atoi                                 
+0     00084ae8  _ltoa                                 
+0     00084b16  FD$$CMP                               
+0     00084b40  L$$DIV                                
+0     00084b4f  L$$MOD                                
+0     00084b5d  UL$$DIV                               
+0     00084b64  UL$$MOD                               
+0     00084b6a  C$$EXIT                               
+0     00084b6a  _abort                                
+0     00084b6c  _exit                                 
+0     00084b93  _InitPieCtrl                          
+0     00084bb2  _EnableInterrupts                     
+0     00084bbb  _InitPieVectTable                     
+0     00084be1  _copysignl                            
+0     00084c03  FD$$TOI                               
+0     00084c24  FD$$TOL                               
+0     00084c43  LL$$CMP                               
+0     00084c55  ULL$$CMP                              
+0     00084c61  _memcpy                               
+0     00084c7f  _strncpy                              
+0     00084c9d  I$$TOFD                               
+0     00084cba  FS$$TOFD                              
+0     00084cd6  L$$TOFD                               
+0     00084cf2  _ddcopy                               
+0     00084cf2  _dpcopy                               
+0     00084cf2  _pdcopy                               
+0     00084cf2  _ppcopy                               
+0     00084d0c  __args_main                           
+0     00084d25  LL$$AND                               
+0     00084d2d  LL$$OR                                
+0     00084d35  LL$$XOR                               
+0     00084d3d  _memchr                               
+0     00084d4e  FD$$SUB                               
+0     00084d5c  _memccpy                              
+0     00084d69  _memset                               
+0     00084d75  _strchr                               
+0     00084d81  _strcmp                               
+0     00084d8b  __register_unlock                     
+0     00084d8f  __register_lock                       
+0     00084d93  __nop                                 
+0     00084d94  FD$$NEG                               
+0     00084da5  _strlen                               
+0     00084dad  _remove                               
+0     00084db0  __system_pre_init                     
+0     00084db2  __system_post_cinit                   
 0     00086000  _RamfuncsLoadStart                    
 0     00086072  _RamfuncsLoadEnd                      
 0     00090000  _PieVectTableInit                     
-0     000901c0  __ctypes_                             
+0     00090310  __ctypes_                             
 1     00000400  __stack                               
 1     00000600  __STACK_END                           
 1     00000b00  _AdcaResultRegs                       
@@ -1839,10 +1845,10 @@ page  address   name
 1     0000aeb0  __unlock                              
 1     0000aeb2  _errno                                
 1     0000aeb4  _deviceOpen                           
-1     0000aec0  _blueLED_state                        
-1     0000aec1  _redLED_state                         
-1     0000aec2  _resultsIndex                         
-1     0000aec3  _status                               
+1     0000aec0  _status                               
+1     0000aec1  _blueLED_state                        
+1     0000aec2  _redLED_state                         
+1     0000aec3  _resultsIndex                         
 1     0000aec4  _fid                                  
 1     0000af00  _AdcaResults                          
 1     00047000  _Emif1Regs                            
@@ -1885,4 +1891,4 @@ abs   ffffffff  binit
 abs   ffffffff  etext                                 
 abs   ffffffff  pinit                                 
 
-[446 symbols]
+[449 symbols]
