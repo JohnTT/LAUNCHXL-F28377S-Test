@@ -49,6 +49,13 @@ void SetupADCContinuous(Uint16 channel);
 #define RESULTS_BUFFER_SIZE 256 //buffer for storing conversion results
                                 //(size must be multiple of 16)
 
+#define LED_GPIO_RED    12
+#define LED_GPIO_BLUE	13
+
+enum ADCINID {
+	ADCINID_B4 = 0x14
+};
+
 //
 // Globals
 //
@@ -58,6 +65,48 @@ Uint16 resultsIndex;
 // FILE -> printf variables
 volatile int status = 0;
 volatile FILE *fid;
+
+// LED states
+int blueLED_state = 0;
+int redLED_state = 0;
+
+
+int16_t sampleADC(int id)
+{
+	int16_t temp;
+
+	switch (id) {
+	case ADCINID_B4:
+		//Force start of conversion on SOC4
+		AdcbRegs.ADCSOCFRC1.bit.SOC4 = 1;
+
+		//Wait for end of conversion.
+		while (AdcbRegs.ADCINTFLG.bit.ADCINT1 == 0) {
+		}  //Wait for ADCINT1
+		AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;        //Clear ADCINT1
+
+		temp = AdcbResultRegs.ADCRESULT4;
+		break;
+	default:
+		//Force start of conversion on SOC0
+		AdcaRegs.ADCSOCFRC1.bit.SOC0 = 1;
+
+		//Wait for end of conversion.
+		while (AdcaRegs.ADCINTFLG.bit.ADCINT1 == 0) {
+		}  //Wait for ADCINT1
+		AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;        //Clear ADCINT1
+
+		//Get temp sensor sample result from SOC0
+		temp = AdcaResultRegs.ADCRESULT0;
+		break;
+
+	}
+
+
+    //Return the raw temperature because the devices don't have slope/offset values
+    return(temp);
+
+}
 
 void scia_init()
 {
@@ -102,15 +151,9 @@ void main(void)
 // This example function is found in the F2837xS_Gpio.c file and
 // illustrates how to set the GPIO to it's default state.
 //
-//    InitGpio(); // Skipped for this example
+   InitGpio(); // Skipped for this example
 
-    // For this example, only init the pins for the SCI-A port.
-	EALLOW;
-	GpioCtrlRegs.GPCMUX2.bit.GPIO84 = 1;
-	GpioCtrlRegs.GPCMUX2.bit.GPIO85 = 1;
-	GpioCtrlRegs.GPCGMUX2.bit.GPIO84 = 1;
-	GpioCtrlRegs.GPCGMUX2.bit.GPIO85 = 1;
-	EDIS;
+
 
 //
 // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -142,29 +185,90 @@ void main(void)
 //
     InitPieVectTable();
 
-    //Redirect STDOUT to SCI
-    scia_init();
-	status = add_device("scia", _SSA, SCI_open, SCI_close, SCI_read, SCI_write,
-			SCI_lseek, SCI_unlink, SCI_rename);
-	fid = fopen("scia", "w");
-	freopen("scia:", "w", stdout);
-	setvbuf(stdout, NULL, _IONBF, 0);
-
-//
-// Configure the ADC and power it up
-//
-    ConfigureADC();
-
-//
-// Setup the ADC for continuous conversions on channel 0
-//
-    SetupADCContinuous(0);
-
-//
-// Enable global Interrupts and higher priority real-time debug events:
-//
+    // Enable global Interrupts and higher priority real-time debug events:
+    //
     EINT;  // Enable Global interrupt INTM
     ERTM;  // Enable Global realtime interrupt DBGM
+
+// LED initializations
+    {
+		GPIO_SetupPinMux(LED_GPIO_RED, GPIO_MUX_CPU1, 0);
+		GPIO_SetupPinOptions(LED_GPIO_RED, GPIO_OUTPUT, GPIO_PUSHPULL);
+
+		GPIO_SetupPinMux(LED_GPIO_BLUE, GPIO_MUX_CPU1, 0);
+		GPIO_SetupPinOptions(LED_GPIO_BLUE, GPIO_OUTPUT, GPIO_PUSHPULL);
+
+		GPIO_WritePin(LED_GPIO_RED, 1);
+		GPIO_WritePin(LED_GPIO_BLUE, 1);
+    }
+
+
+// Printf via SCI initialization
+    {
+		// For this example, only init the pins for the SCI-A port.
+		EALLOW;
+		GpioCtrlRegs.GPCMUX2.bit.GPIO84 = 1;
+		GpioCtrlRegs.GPCMUX2.bit.GPIO85 = 1;
+		GpioCtrlRegs.GPCGMUX2.bit.GPIO84 = 1;
+		GpioCtrlRegs.GPCGMUX2.bit.GPIO85 = 1;
+		EDIS;
+
+		// Redirect STDOUT to SCI
+		scia_init();
+		status = add_device("scia", _SSA, SCI_open, SCI_close, SCI_read,
+				SCI_write, SCI_lseek, SCI_unlink, SCI_rename);
+		fid = fopen("scia", "w");
+		freopen("scia:", "w", stdout);
+		setvbuf(stdout, NULL, _IONBF, 0);
+    }
+
+
+
+
+
+// ADC1 configuation
+    {
+		// Configure the ADC:
+		// Initialize the ADC
+		EALLOW;
+
+		//write configurations
+		AdcaRegs.ADCCTL2.bit.PRESCALE = 6; //set ADCCLK divider to /4
+		AdcbRegs.ADCCTL2.bit.PRESCALE = 6; //set ADCCLK divider to /4
+		AdcSetMode(ADC_ADCA, ADC_RESOLUTION_12BIT, ADC_SIGNALMODE_SINGLE);
+		AdcSetMode(ADC_ADCB, ADC_RESOLUTION_12BIT, ADC_SIGNALMODE_SINGLE);
+
+		//Set pulse positions to late
+		AdcaRegs.ADCCTL1.bit.INTPULSEPOS = 1;
+		AdcbRegs.ADCCTL1.bit.INTPULSEPOS = 1;
+
+		//power up the ADCs
+		AdcaRegs.ADCCTL1.bit.ADCPWDNZ = 1;
+		AdcbRegs.ADCCTL1.bit.ADCPWDNZ = 1;
+
+		//delay for 1ms to allow ADC time to power up
+		DELAY_US(1000);
+
+		//ADC Register Configuration
+		EALLOW;
+
+		//ADCINA0
+		AdcaRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINA0
+		AdcaRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+		AdcaRegs.ADCINTSEL1N2.bit.INT1SEL = 0; //end of SOC0 will set INT1 flag
+		AdcaRegs.ADCINTSEL1N2.bit.INT1E = 1;   //enable INT1 flag
+		AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
+
+		//ADCINB4
+		AdcbRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC0 will convert pin ADCINB4
+		AdcbRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+		AdcbRegs.ADCINTSEL1N2.bit.INT1SEL = 4; //end of SOC4 will set INT1 flag
+		AdcbRegs.ADCINTSEL1N2.bit.INT1E = 1;   //enable INT1 flag
+		AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
+
+
+    }
+
 
 //
 // Initialize results buffer
@@ -180,107 +284,12 @@ void main(void)
 //
     do
     {
-//		putchar(0x1B);
-//		putchar('[');
-//		putchar('u');
     	printf("We main while\n\r");
-//        //
-//        //enable ADCINT flags
-//        //
-//        AdcaRegs.ADCINTSEL1N2.bit.INT1E = 1;
-//        AdcaRegs.ADCINTSEL1N2.bit.INT2E = 1;
-//        AdcaRegs.ADCINTSEL3N4.bit.INT3E = 1;
-//        AdcaRegs.ADCINTSEL3N4.bit.INT4E = 1;
-//        AdcaRegs.ADCINTFLGCLR.all = 0x000F;
-//
-//        //
-//        //initialize results index
-//        //
-//        resultsIndex = 0;
-//
-//        //
-//        //software force start SOC0 to SOC7
-//        //
-//        AdcaRegs.ADCSOCFRC1.all = 0x00FF;
-//
-//        //
-//        //keep taking samples until the results buffer is full
-//        //
-//        while(resultsIndex < RESULTS_BUFFER_SIZE)
-//        {
-//            //
-//            //wait for first set of 8 conversions to complete
-//            //
-//            while(0 == AdcaRegs.ADCINTFLG.bit.ADCINT3);
-//
-//            //
-//            //clear both INT flags generated by first 8 conversions
-//            //
-//            AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
-//            AdcaRegs.ADCINTFLGCLR.bit.ADCINT3 = 1;
-//
-//            //
-//            //save results for first 8 conversions
-//            //
-//            //note that during this time, the second 8 conversions have
-//            //already been triggered by EOC6->ADCIN1 and will be actively
-//            //converting while first 8 results are being saved
-//            //
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT0;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT1;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT2;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT3;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT4;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT5;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT6;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT7;
-//
-//            //
-//            //wait for the second set of 8 conversions to complete
-//            //
-//            while(0 == AdcaRegs.ADCINTFLG.bit.ADCINT4);
-//
-//            //
-//            //clear both INT flags generated by second 8 conversions
-//            //
-//            AdcaRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
-//            AdcaRegs.ADCINTFLGCLR.bit.ADCINT4 = 1;
-//
-//            //
-//            //save results for second 8 conversions
-//            //
-//            //note that during this time, the first 8 conversions have
-//            //already been triggered by EOC14->ADCIN2 and will be actively
-//            //converting while second 8 results are being saved
-//            //
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT8;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT9;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT10;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT11;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT12;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT13;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT14;
-//            AdcaResults[resultsIndex++] = AdcaResultRegs.ADCRESULT15;
-//        }
-//
-//        //
-//        //disable all ADCINT flags to stop sampling
-//        //
-//        AdcaRegs.ADCINTSEL1N2.bit.INT1E = 0;
-//        AdcaRegs.ADCINTSEL1N2.bit.INT2E = 0;
-//        AdcaRegs.ADCINTSEL3N4.bit.INT3E = 0;
-//        AdcaRegs.ADCINTSEL3N4.bit.INT4E = 0;
-//
-//        //
-//        //at this point, AdcaResults[] contains a sequence of conversions
-//        //from the selected channel
-//        //
-//
-//        //
-//        //software breakpoint, hit run again to get updated conversions
-//        //
-//
-//        asm("   ESTOP0");
+    	printf("ADCINA0 Sample = %d\n\r", sampleADC(0));
+    	printf("ADCINB4 Sample = %d\n\r", sampleADC(ADCINID_B4));
+    	GPIO_WritePin(LED_GPIO_RED, redLED_state);
+    	redLED_state = !redLED_state;
+
 		DELAY_US(1000*1000);
     }while(1);
 }
@@ -289,142 +298,33 @@ void main(void)
 // ConfigureADC - Write ADC configurations and power up the ADC for both
 //                ADC A and ADC B
 //
-void ConfigureADC(void)
-{
-    EALLOW;
-
-    //
-    //write configurations
-    //
-    AdcaRegs.ADCCTL2.bit.PRESCALE = 6; //set ADCCLK divider to /4
-    AdcSetMode(ADC_ADCA, ADC_RESOLUTION_12BIT, ADC_SIGNALMODE_SINGLE);
-
-    //
-    //Set pulse positions to late
-    //
-    AdcaRegs.ADCCTL1.bit.INTPULSEPOS = 1;
-
-    //
-    //power up the ADC
-    //
-    AdcaRegs.ADCCTL1.bit.ADCPWDNZ = 1;
-
-    //
-    //delay for 1ms to allow ADC time to power up
-    //
-    DELAY_US(1000);
-
-    EDIS;
-}
-
+//void ConfigureADC(void)
+//{
+//    EALLOW;
 //
-// SetupADCContinuous - setup the ADC to continuously convert on one channel
+//    //
+//    //write configurations
+//    //
+//    AdcaRegs.ADCCTL2.bit.PRESCALE = 6; //set ADCCLK divider to /4
+//    AdcSetMode(ADC_ADCA, ADC_RESOLUTION_12BIT, ADC_SIGNALMODE_SINGLE);
 //
-void SetupADCContinuous(Uint16 channel)
-{
-    Uint16 acqps;
-
-    //
-    //determine minimum acquisition window (in SYSCLKS) based on resolution
-    //
-    if(ADC_RESOLUTION_12BIT == AdcaRegs.ADCCTL2.bit.RESOLUTION)
-    {
-        acqps = 14; //75ns
-    }
-    else //resolution is 16-bit
-    {
-        acqps = 63; //320ns
-    }
-
-    EALLOW;
-    AdcaRegs.ADCSOC0CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC1CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC2CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC3CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC4CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC5CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC6CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC7CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC8CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC9CTL.bit.CHSEL  = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC10CTL.bit.CHSEL = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC11CTL.bit.CHSEL = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC12CTL.bit.CHSEL = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC13CTL.bit.CHSEL = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC14CTL.bit.CHSEL = channel;  //SOC will convert on channel
-    AdcaRegs.ADCSOC15CTL.bit.CHSEL = channel;  //SOC will convert on channel
-
-    AdcaRegs.ADCSOC0CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC1CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC2CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC3CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC4CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC5CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC6CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC7CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC9CTL.bit.ACQPS  = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC10CTL.bit.ACQPS = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC11CTL.bit.ACQPS = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC12CTL.bit.ACQPS = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC13CTL.bit.ACQPS = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC14CTL.bit.ACQPS = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-    AdcaRegs.ADCSOC15CTL.bit.ACQPS = acqps;    //sample window is acqps +
-                                               //1 SYSCLK cycles
-
-    AdcaRegs.ADCINTSEL1N2.bit.INT1E = 0; //disable INT1 flag
-    AdcaRegs.ADCINTSEL1N2.bit.INT2E = 0; //disable INT2 flag
-    AdcaRegs.ADCINTSEL3N4.bit.INT3E = 0; //disable INT3 flag
-    AdcaRegs.ADCINTSEL3N4.bit.INT4E = 0; //disable INT4 flag
-
-    AdcaRegs.ADCINTSEL1N2.bit.INT1CONT = 0;
-    AdcaRegs.ADCINTSEL1N2.bit.INT2CONT = 0;
-    AdcaRegs.ADCINTSEL3N4.bit.INT3CONT = 0;
-    AdcaRegs.ADCINTSEL3N4.bit.INT4CONT = 0;
-
-    AdcaRegs.ADCINTSEL1N2.bit.INT1SEL = 6;  //end of SOC6 will set INT1 flag
-    AdcaRegs.ADCINTSEL1N2.bit.INT2SEL = 14; //end of SOC14 will set INT2 flag
-    AdcaRegs.ADCINTSEL3N4.bit.INT3SEL = 7;  //end of SOC7 will set INT3 flag
-    AdcaRegs.ADCINTSEL3N4.bit.INT4SEL = 15; //end of SOC15 will set INT4 flag
-
-    //
-    //ADCINT2 will trigger first 8 SOCs
-    //
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC0 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC1 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC2 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC3 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC4 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC5 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC6 = 2;
-    AdcaRegs.ADCINTSOCSEL1.bit.SOC7 = 2;
-
-    //
-    //ADCINT1 will trigger second 8 SOCs
-    //
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC8 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC9 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC10 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC11 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC12 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC13 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC14 = 1;
-    AdcaRegs.ADCINTSOCSEL2.bit.SOC15 = 1;
-    EDIS;
-}
+//    //
+//    //Set pulse positions to late
+//    //
+//    AdcaRegs.ADCCTL1.bit.INTPULSEPOS = 1;
+//
+//    //
+//    //power up the ADC
+//    //
+//    AdcaRegs.ADCCTL1.bit.ADCPWDNZ = 1;
+//
+//    //
+//    //delay for 1ms to allow ADC time to power up
+//    //
+//    DELAY_US(1000);
+//
+//    EDIS;
+//}
 
 //
 // End of file
