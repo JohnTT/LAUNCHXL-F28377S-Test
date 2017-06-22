@@ -46,6 +46,7 @@ void configureSCIprintf(void);
 
 void scia_init(void);
 uint16_t sampleADC(uint16_t id);
+void convertADCBank(uint16_t id);
 
 //
 // Defines
@@ -86,6 +87,24 @@ volatile FILE *fid;
 // LED states
 int blueLED_state = 0;
 int redLED_state = 0;
+
+// J1 and J3
+uint16_t SGND51R_ADC = 0; // Short to SGND through 51R
+uint16_t VC4_ADC = 0;
+uint16_t V2AB_ADC = 0;
+uint16_t VC3_ADC = 0;
+uint16_t V1AB_ADC = 0;
+uint16_t IL4_ADC = 0;
+uint16_t IL3_ADC = 0;
+
+// J5 and J7
+uint16_t VDC2_ADC = 0;
+uint16_t VDC1_ADC = 0;
+uint16_t IL2_ADC = 0;
+uint16_t SGND_ADC = 0; // Short to SGND
+uint16_t S1V5_ADC = 0; // Short to 1.5V
+uint16_t ANALOG_ADC = 0;
+uint16_t IL1_ADC = 0;
 
 
 
@@ -150,6 +169,29 @@ void main(void) {
 
 // take conversions indefinitely in loop
 	do {
+		convertADCBank(0x00); // Convert Bank A
+		convertADCBank(0x10); // Convert Bank B
+
+
+		// J1 and J3
+		SGND51R_ADC = sampleADC(ADCINID_14); // Short to SGND through 51R
+		VC4_ADC = sampleADC(ADCINID_B1);
+		V2AB_ADC = sampleADC(ADCINID_B4);
+		VC3_ADC = sampleADC(ADCINID_B2);
+		V1AB_ADC = sampleADC(ADCINID_A0);
+		IL4_ADC = sampleADC(ADCINID_B0);
+		IL3_ADC = sampleADC(ADCINID_A1);
+
+		// J5 and J7
+		VDC2_ADC = sampleADC(ADCINID_15);
+		VDC1_ADC = sampleADC(ADCINID_A2);
+		IL2_ADC = sampleADC(ADCINID_A5);
+		SGND_ADC = sampleADC(ADCINID_B5); // Short to SGND
+		S1V5_ADC = sampleADC(ADCINID_A3); // Short to 1.5V
+		ANALOG_ADC = sampleADC(ADCINID_B3);
+		IL1_ADC = sampleADC(ADCINID_A4);
+
+
 		printf("main while\n\r");
 		printf("ADCINA0 Sample = %d\n\r", sampleADC(ADCINID_A0));
 		printf("ADCINA1 Sample = %d\n\r", sampleADC(ADCINID_A1));
@@ -255,7 +297,7 @@ void configureADC() {
 	//
 	//ADCINA
 	//
-	AdcaRegs.ADCINTSEL1N2.bit.INT1SEL = 0x07; //end of SOC5 will set INT1 flag
+	AdcaRegs.ADCINTSEL1N2.bit.INT1SEL = 0x07; //end of SOC7 will set INT1 flag
 	AdcaRegs.ADCINTSEL1N2.bit.INT1E = 1;   //enable INT1 flag
 	AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
 
@@ -324,24 +366,24 @@ void configureADC() {
 
 }
 
-uint16_t sampleADC(uint16_t id) {
-	uint16_t temp;
-
-	// Convert B
+void convertADCBank(uint16_t id) {
 	if (id >= 0x10) {
 		AdcbRegs.ADCSOCFRC1.all = 0xFF; //Force Convert ADCINB
-		while (AdcbRegs.ADCINTFLG.bit.ADCINT1 == 0) {}  //Wait for ADCINT1
+		while (AdcbRegs.ADCINTFLG.bit.ADCINT1 == 0) {
+		}  //Wait for ADCINT1
 		AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;        //Clear ADCINT1
-
 	}
-
 	// Convert A
 	else {
 		AdcaRegs.ADCSOCFRC1.all = 0xFF; //Force Convert ADCINA
-		while (AdcaRegs.ADCINTFLG.bit.ADCINT1 == 0) {}  //Wait for ADCINT1
+		while (AdcaRegs.ADCINTFLG.bit.ADCINT1 == 0) {
+		}  //Wait for ADCINT1
 		AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;        //Clear ADCINT1
 	}
+}
 
+uint16_t sampleADC(uint16_t id) {
+	uint16_t temp;
 
 	switch (id) {
 	case ADCINID_A0:
