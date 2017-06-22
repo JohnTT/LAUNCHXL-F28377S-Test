@@ -16,6 +16,7 @@ ORDERED_OBJS += \
 "./F2837xS_CodeStartBranch.obj" \
 "./F2837xS_CpuTimers.obj" \
 "./F2837xS_DefaultISR.obj" \
+"./F2837xS_EPwm.obj" \
 "./F2837xS_GlobalVariableDefs.obj" \
 "./F2837xS_Gpio.obj" \
 "./F2837xS_PieCtrl.obj" \
@@ -24,6 +25,7 @@ ORDERED_OBJS += \
 "./F2837xS_SysCtrl.obj" \
 "./F2837xS_usDelay.obj" \
 "./LAUNCHXL-F28377S-Test.obj" \
+"./profilec.obj" \
 "./sci_io.obj" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/cmd/2837xS_Generic_FLASH_lnk.cmd" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/cmd/F2837xS_Headers_nonBIOS.cmd" \
@@ -167,9 +169,9 @@ Example_28377SLaunchPad.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "F2837xS_Adc.d" "F2837xS_CpuTimers.d" "F2837xS_DefaultISR.d" "F2837xS_GlobalVariableDefs.d" "F2837xS_Gpio.d" "F2837xS_PieCtrl.d" "F2837xS_PieVect.d" "F2837xS_Sci.d" "F2837xS_SysCtrl.d" "LAUNCHXL-F28377S-Test.d" "sci_io.d" 
-	-$(RM) "F2837xS_Adc.obj" "F2837xS_CodeStartBranch.obj" "F2837xS_CpuTimers.obj" "F2837xS_DefaultISR.obj" "F2837xS_GlobalVariableDefs.obj" "F2837xS_Gpio.obj" "F2837xS_PieCtrl.obj" "F2837xS_PieVect.obj" "F2837xS_Sci.obj" "F2837xS_SysCtrl.obj" "F2837xS_usDelay.obj" "LAUNCHXL-F28377S-Test.obj" "sci_io.obj" 
-	-$(RM) "F2837xS_CodeStartBranch.d" "F2837xS_usDelay.d" 
+	-$(RM) "F2837xS_Adc.d" "F2837xS_CpuTimers.d" "F2837xS_DefaultISR.d" "F2837xS_EPwm.d" "F2837xS_GlobalVariableDefs.d" "F2837xS_Gpio.d" "F2837xS_PieCtrl.d" "F2837xS_PieVect.d" "F2837xS_Sci.d" "F2837xS_SysCtrl.d" "LAUNCHXL-F28377S-Test.d" "sci_io.d" 
+	-$(RM) "F2837xS_Adc.obj" "F2837xS_CodeStartBranch.obj" "F2837xS_CpuTimers.obj" "F2837xS_DefaultISR.obj" "F2837xS_EPwm.obj" "F2837xS_GlobalVariableDefs.obj" "F2837xS_Gpio.obj" "F2837xS_PieCtrl.obj" "F2837xS_PieVect.obj" "F2837xS_Sci.obj" "F2837xS_SysCtrl.obj" "F2837xS_usDelay.obj" "LAUNCHXL-F28377S-Test.obj" "profilec.obj" "sci_io.obj" 
+	-$(RM) "F2837xS_CodeStartBranch.d" "F2837xS_usDelay.d" "profilec.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

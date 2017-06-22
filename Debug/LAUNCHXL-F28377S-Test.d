@@ -57,8 +57,8 @@ LAUNCHXL-F28377S-Test.obj: C:/ti/controlSUITE/device_support/F2837xS/v180/F2837x
 LAUNCHXL-F28377S-Test.obj: C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_SysCtrl_defines.h
 LAUNCHXL-F28377S-Test.obj: C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_Upp_defines.h
 LAUNCHXL-F28377S-Test.obj: C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_defaultisr.h
-LAUNCHXL-F28377S-Test.obj: ../ti_ascii.h
 LAUNCHXL-F28377S-Test.obj: ../sci_io.h
+LAUNCHXL-F28377S-Test.obj: C:/ti/controlSUITE/libs/dsp/SGEN/v101/include/sgen.h
 
 ../LAUNCHXL-F28377S-Test.c: 
 C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include/stdint.h: 
@@ -117,5 +117,5 @@ C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_Dm
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_SysCtrl_defines.h: 
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_Upp_defines.h: 
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include/F2837xS_defaultisr.h: 
-../ti_ascii.h: 
 ../sci_io.h: 
+C:/ti/controlSUITE/libs/dsp/SGEN/v101/include/sgen.h: 

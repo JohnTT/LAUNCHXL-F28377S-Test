@@ -9,12 +9,14 @@ C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/cmd/F2837xS_Heade
 
 ASM_SRCS += \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_CodeStartBranch.asm \
-C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_usDelay.asm 
+C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_usDelay.asm \
+C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/profilec.asm 
 
 C_SRCS += \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Adc.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_CpuTimers.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_DefaultISR.c \
+C:/ti/controlSUITE/device_support/F2837xS/v210/F2837xS_common/source/F2837xS_EPwm.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/source/F2837xS_GlobalVariableDefs.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Gpio.c \
 C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_PieCtrl.c \
@@ -29,6 +31,7 @@ OBJS += \
 ./F2837xS_CodeStartBranch.obj \
 ./F2837xS_CpuTimers.obj \
 ./F2837xS_DefaultISR.obj \
+./F2837xS_EPwm.obj \
 ./F2837xS_GlobalVariableDefs.obj \
 ./F2837xS_Gpio.obj \
 ./F2837xS_PieCtrl.obj \
@@ -37,16 +40,19 @@ OBJS += \
 ./F2837xS_SysCtrl.obj \
 ./F2837xS_usDelay.obj \
 ./LAUNCHXL-F28377S-Test.obj \
+./profilec.obj \
 ./sci_io.obj 
 
 ASM_DEPS += \
 ./F2837xS_CodeStartBranch.d \
-./F2837xS_usDelay.d 
+./F2837xS_usDelay.d \
+./profilec.d 
 
 C_DEPS += \
 ./F2837xS_Adc.d \
 ./F2837xS_CpuTimers.d \
 ./F2837xS_DefaultISR.d \
+./F2837xS_EPwm.d \
 ./F2837xS_GlobalVariableDefs.d \
 ./F2837xS_Gpio.d \
 ./F2837xS_PieCtrl.d \
@@ -60,6 +66,7 @@ C_DEPS__QUOTED += \
 "F2837xS_Adc.d" \
 "F2837xS_CpuTimers.d" \
 "F2837xS_DefaultISR.d" \
+"F2837xS_EPwm.d" \
 "F2837xS_GlobalVariableDefs.d" \
 "F2837xS_Gpio.d" \
 "F2837xS_PieCtrl.d" \
@@ -74,6 +81,7 @@ OBJS__QUOTED += \
 "F2837xS_CodeStartBranch.obj" \
 "F2837xS_CpuTimers.obj" \
 "F2837xS_DefaultISR.obj" \
+"F2837xS_EPwm.obj" \
 "F2837xS_GlobalVariableDefs.obj" \
 "F2837xS_Gpio.obj" \
 "F2837xS_PieCtrl.obj" \
@@ -82,16 +90,19 @@ OBJS__QUOTED += \
 "F2837xS_SysCtrl.obj" \
 "F2837xS_usDelay.obj" \
 "LAUNCHXL-F28377S-Test.obj" \
+"profilec.obj" \
 "sci_io.obj" 
 
 ASM_DEPS__QUOTED += \
 "F2837xS_CodeStartBranch.d" \
-"F2837xS_usDelay.d" 
+"F2837xS_usDelay.d" \
+"profilec.d" 
 
 C_SRCS__QUOTED += \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Adc.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_CpuTimers.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_DefaultISR.c" \
+"C:/ti/controlSUITE/device_support/F2837xS/v210/F2837xS_common/source/F2837xS_EPwm.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/source/F2837xS_GlobalVariableDefs.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_Gpio.c" \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_PieCtrl.c" \
@@ -103,6 +114,7 @@ C_SRCS__QUOTED += \
 
 ASM_SRCS__QUOTED += \
 "C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_CodeStartBranch.asm" \
-"C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_usDelay.asm" 
+"C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/source/F2837xS_usDelay.asm" \
+"C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/profilec.asm" 
 
 
