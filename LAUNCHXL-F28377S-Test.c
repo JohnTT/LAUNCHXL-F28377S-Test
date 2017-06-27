@@ -88,6 +88,8 @@ int blueLED_state = 0;
 int redLED_state = 0;
 
 // Analog to Digital (ADC)
+
+// Digital Values
 // J1 and J3
 uint16_t SGND51R_ADC = 0; // Short to SGND through 51R
 uint16_t VC4_ADC = 0;
@@ -105,6 +107,21 @@ uint16_t SGND_ADC = 0; // Short to SGND
 uint16_t S1V5_ADC = 0; // Short to 1.5V
 uint16_t ANALOG_ADC = 0;
 uint16_t IL1_ADC = 0;
+
+// Actual Values
+float VC4_REAL = 0;
+float V2AB_REAL = 0;
+float VC3_REAL = 0;
+float V1AB_REAL = 0;
+float IL4_REAL = 0;
+float IL3_REAL = 0;
+
+// J5 and J7
+float VDC2_REAL = 0;
+float VDC1_REAL = 0;
+float IL2_REAL = 0;
+float ANALOG_REAL = 0;
+float IL1_REAL = 0;
 
 // EPWM
 Uint32 EPwm1TimerIntCount;
@@ -260,6 +277,7 @@ void main(void) {
 		convertADCBank(0x00); // Convert Bank A
 		convertADCBank(0x10); // Convert Bank B
 
+		// Digital Values
 		// J1 and J3
 		SGND51R_ADC = sampleADC(ADCINID_14); // Short to SGND through 51R
 		VC4_ADC = sampleADC(ADCINID_B1);
@@ -278,6 +296,8 @@ void main(void) {
 		ANALOG_ADC = sampleADC(ADCINID_B3);
 		IL1_ADC = sampleADC(ADCINID_A4);
 
+		// Actual Values
+		V2AB_REAL = (2.0*V2AB_ADC) - 6234.0;
 //		printf("main while\n\r");
 //		printf("ADCINA0 Sample = %u\n\r", sampleADC(ADCINID_A0));
 //		printf("ADCINA1 Sample = %u\n\r", sampleADC(ADCINID_A1));
@@ -298,7 +318,7 @@ void main(void) {
 		GPIO_WritePin(LED_GPIO_RED, redLED_state);
 		redLED_state = !redLED_state;
 
-		DELAY_US(1000*10);
+		// DELAY_US(100*1);
 	} while (1);
 }
 
