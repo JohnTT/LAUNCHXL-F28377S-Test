@@ -44,6 +44,8 @@
 #define LED_GPIO_RED    12
 #define LED_GPIO_BLUE	13
 
+#define VOLTAGE_LIMIT 300.0
+
 // Analog to Digital (ADC)
 enum ADCINID {
 	ADCINID_A0 = 0x00,
@@ -62,6 +64,8 @@ enum ADCINID {
 	ADCINID_B4 = 0x14,
 	ADCINID_B5 = 0x15
 };
+
+#define MOV_AVG_SIZE 128
 
 // EPWM
 #define EPWM1_MAX_DB   0x03FF
@@ -87,8 +91,8 @@ volatile FILE *fid;
 int blueLED_state = 0;
 int redLED_state = 0;
 
-float CMPHI = 8.0;
-float CMPLO = -8.0;
+double CMPHI = 8.0;
+double CMPLO = -8.0;
 int up = 1;
 
 // Analog to Digital (ADC)
@@ -113,19 +117,25 @@ uint16_t ANALOG_ADC = 0;
 uint16_t IL1_ADC = 0;
 
 // Actual Values
-float VC4_Real = 0;
-float V2AB_Real = 0;
-float VC3_Real = 0;
-float V1AB_Real = 0;
-float IL4_Real = 0;
-float IL3_Real = 0;
+uint16_t buf_idx = 0;
+double VC4_Real = 0;
+
+double V2AB_Real = 0;
+double V2AB_Real_Buf[MOV_AVG_SIZE];
+double V2AB_Real_BufSum = 0;
+double V2AB_Real_Avg = 0;
+
+double VC3_Real = 0;
+double V1AB_Real = 0;
+double IL4_Real = 0;
+double IL3_Real = 0;
 
 // J5 and J7
-float VDC2_Real = 0;
-float VDC1_Real = 0;
-float IL2_Real = 0;
-float ANALOG_Real = 0;
-float IL1_Real = 0;
+double VDC2_Real = 0;
+double VDC1_Real = 0;
+double IL2_Real = 0;
+double ANALOG_Real = 0;
+double IL1_Real = 0;
 
 // EPWM
 Uint32 EPwm1TimerIntCount;
@@ -154,7 +164,10 @@ void configureADC(void);
 uint16_t sampleADC(uint16_t id);
 void convertADCBank(uint16_t id);
 void storeADCValues(void);
+void movingAvgADC(void);
+
 void haltOverVoltage(void);
+void hysteresisControl(void);
 
 // EPWM
 void configureGateDriver(void);
@@ -266,7 +279,7 @@ void main(void) {
 
 
 	// Configure CPU-Timer 0,1,2 to __interrupt
-	ConfigCpuTimer(&CpuTimer0, 200, 10);
+	ConfigCpuTimer(&CpuTimer0, 200, 10); // lower than 10us too fast, prevents other ISR from running
 	ConfigCpuTimer(&CpuTimer1, 200, 500000);
 	ConfigCpuTimer(&CpuTimer2, 200, 250000);
 
@@ -317,19 +330,6 @@ void main(void) {
 
 // take conversions indefinitely in loop
 	do {
-
-		// Analog to Digital (ADC)
-//		convertADCBank(0x00); // Convert Bank A
-//		convertADCBank(0x10); // Convert Bank B
-
-
-
-		haltOverVoltage();
-
-
-
-
-
 
 //		toggleBlueLED();
 
@@ -389,6 +389,12 @@ void configureSCIprintf() {
 }
 
 void configureADC() {
+	// Initialize Moving Average Arrays
+	int idx;
+	for (idx = 0; idx < MOV_AVG_SIZE; idx++) {
+		V2AB_Real_Buf[idx] = 0;
+	}
+
 	// ADC1 configuation
 
 	// Configure the ADC:
@@ -887,7 +893,7 @@ void storeADCValues() {
 	IL1_ADC = sampleADC(ADCINID_A4);
 
 	// Actual Values
-	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
+	V2AB_Real = (2.0 * V2AB_ADC) - 6236.0;
 }
 
 void printAndyBoard(void) {
@@ -913,21 +919,31 @@ void printAndyBoard(void) {
 }
 
 void haltOverVoltage(void) {
+	if (V2AB_Real_Avg > VOLTAGE_LIMIT || V2AB_Real_Avg < (-1.0*VOLTAGE_LIMIT)) {
+		while (1) {
+			toggleBlueLED();
+			DELAY_US(1000*1000);
+			toggleRedLED();
+			DELAY_US(1000*1000);
+		}
+	}
 
 }
 
-void toggleBlueLED() {
-	if (up && V2AB_Real > CMPHI) {
+void hysteresisControl() {
+	if (up && (V2AB_Real_Avg > 10.0)) {
 		up = 0;
-		blueLED_state = !blueLED_state;
-		GPIO_WritePin(LED_GPIO_BLUE, blueLED_state);
+		toggleBlueLED();
 	}
-	else if (!up && V2AB_Real < CMPLO) {
+	else if ((!up) && (V2AB_Real_Avg < -10.0)) {
 		up = 1;
-		blueLED_state = !blueLED_state;
-		GPIO_WritePin(LED_GPIO_BLUE, blueLED_state);
+		toggleBlueLED();
 	}
+}
 
+void toggleBlueLED() {
+	blueLED_state = !blueLED_state;
+	GPIO_WritePin(LED_GPIO_BLUE, blueLED_state);
 }
 
 void toggleRedLED() {
@@ -936,27 +952,39 @@ void toggleRedLED() {
 }
 
 __interrupt void cpu_timer0_isr(void) {
-	//toggleRedLED();
-
 	//printf("timer0\n\r");
-	storeADCValues(); // Store and Convert ADC Values in variables in memory
-	//
-	// Acknowledge this __interrupt to receive more __interrupts from group 1
-	//
-//	AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
-//	AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
 
+	storeADCValues(); // Store and Convert ADC Values in variables in memory
+	movingAvgADC();
+	haltOverVoltage();
+
+	hysteresisControl();
+
+
+	// Acknowledge this __interrupt to receive more __interrupts from group 1
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
 
 __interrupt void cpu_timer1_isr(void) {
-	toggleRedLED();
+	//printf("timer1\n\r");
 
+	toggleRedLED();
 }
 
 __interrupt void cpu_timer2_isr(void) {
-	toggleRedLED();
+	//printf("timer2\n\r");
 
+	toggleRedLED();
+}
+
+void movingAvgADC() {
+	if (buf_idx >= MOV_AVG_SIZE)
+		buf_idx = 0;
+	V2AB_Real_BufSum -= V2AB_Real_Buf[buf_idx];
+	V2AB_Real_Buf[buf_idx] = V2AB_Real;
+	V2AB_Real_BufSum += V2AB_Real_Buf[buf_idx];
+	V2AB_Real_Avg = V2AB_Real_BufSum / MOV_AVG_SIZE;
+	buf_idx++;
 }
 
 //
