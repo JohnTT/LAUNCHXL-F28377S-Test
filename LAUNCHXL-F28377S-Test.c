@@ -87,6 +87,10 @@ volatile FILE *fid;
 int blueLED_state = 0;
 int redLED_state = 0;
 
+float CMPHI = 8.0;
+float CMPLO = -8.0;
+int up = 1;
+
 // Analog to Digital (ADC)
 
 // Digital Values
@@ -109,19 +113,19 @@ uint16_t ANALOG_ADC = 0;
 uint16_t IL1_ADC = 0;
 
 // Actual Values
-float VC4_REAL = 0;
-float V2AB_REAL = 0;
-float VC3_REAL = 0;
-float V1AB_REAL = 0;
-float IL4_REAL = 0;
-float IL3_REAL = 0;
+float VC4_Real = 0;
+float V2AB_Real = 0;
+float VC3_Real = 0;
+float V1AB_Real = 0;
+float IL4_Real = 0;
+float IL3_Real = 0;
 
 // J5 and J7
-float VDC2_REAL = 0;
-float VDC1_REAL = 0;
-float IL2_REAL = 0;
-float ANALOG_REAL = 0;
-float IL1_REAL = 0;
+float VDC2_Real = 0;
+float VDC1_Real = 0;
+float IL2_Real = 0;
+float ANALOG_Real = 0;
+float IL1_Real = 0;
 
 // EPWM
 Uint32 EPwm1TimerIntCount;
@@ -140,13 +144,20 @@ extern void DSP28x_usDelay(Uint32 Count);
 void configureLEDs(void);
 void scia_init(void);
 void configureSCIprintf(void);
+void printAndyBoard(void);
+
+void toggleBlueLED(void);
+void toggleRedLED(void);
 
 // Analog to Digital (ADC)
 void configureADC(void);
 uint16_t sampleADC(uint16_t id);
 void convertADCBank(uint16_t id);
+void storeADCValues(void);
+void haltOverVoltage(void);
 
 // EPWM
+void configureGateDriver(void);
 void InitEPwm1Example(void);
 void InitEPwm2Example(void);
 void InitEPwm3Example(void);
@@ -154,6 +165,11 @@ __interrupt void epwm1_isr(void);
 __interrupt void epwm2_isr(void);
 __interrupt void epwm3_isr(void);
 
+
+// CPU Timers
+__interrupt void cpu_timer0_isr(void);
+__interrupt void cpu_timer1_isr(void);
+__interrupt void cpu_timer2_isr(void);
 
 
 void main(void) {
@@ -223,6 +239,11 @@ void main(void) {
 	PieVectTable.EPWM1_INT = &epwm1_isr;
 	PieVectTable.EPWM2_INT = &epwm2_isr;
 	PieVectTable.EPWM3_INT = &epwm3_isr;
+
+	PieVectTable.TIMER0_INT = &cpu_timer0_isr; // Need this for CPU Timer
+	PieVectTable.TIMER1_INT = &cpu_timer1_isr; // Need this for CPU Timer
+	PieVectTable.TIMER2_INT = &cpu_timer2_isr; // Need this for CPU Timer
+
 	EDIS;
 	// This is needed to disable write to EALLOW protected registers
 
@@ -241,6 +262,24 @@ void main(void) {
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
 	EDIS;
 
+	InitCpuTimers();   // For this example, only initialize the Cpu Timers
+
+
+	// Configure CPU-Timer 0,1,2 to __interrupt
+	ConfigCpuTimer(&CpuTimer0, 200, 10);
+	ConfigCpuTimer(&CpuTimer1, 200, 500000);
+	ConfigCpuTimer(&CpuTimer2, 200, 250000);
+
+	//
+	// To ensure precise timing, use write-only instructions to write to the entire
+	// register. Therefore, if any of the configuration bits are changed in
+	// ConfigCpuTimer and InitCpuTimers (in F2837xS_cputimervars.h), the below
+	// settings must also be updated.
+	//
+	CpuTimer0Regs.TCR.all = 0x4001;
+	CpuTimer1Regs.TCR.all = 0x4001;
+	CpuTimer2Regs.TCR.all = 0x4001;
+
 	//
 	// Step 5. User specific code, enable interrupts:
 	// Initialize counters:
@@ -250,16 +289,22 @@ void main(void) {
 	EPwm3TimerIntCount = 0;
 
 	//
-	// Enable CPU INT3 which is connected to EPWM1-3 INT:
+	// Enable CPU INT1, INT13, INT14 which is connected to CPU-Timer 0, 1, 2:
 	//
-	IER |= M_INT3;
+	IER |= M_INT1; // Enable CPU Timer 0 Interrupts
+	//IER |= M_INT13; // Enable CPU Timer 1 Interrupts
+	IER |= M_INT14; // Enable CPU Timer 2 Interrupts
 
 	//
 	// Enable EPWM INTn in the PIE: Group 3 interrupt 1-3
 	//
-	PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
-	PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
-	PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
+//	PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
+//	PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
+//	PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
+
+
+	// Enable Timer0 Interrupt, TINT0 in the PIE: Group 1 __interrupt 7
+	PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
 
 
 	// User Configuration Functions
@@ -274,49 +319,19 @@ void main(void) {
 	do {
 
 		// Analog to Digital (ADC)
-		convertADCBank(0x00); // Convert Bank A
-		convertADCBank(0x10); // Convert Bank B
+//		convertADCBank(0x00); // Convert Bank A
+//		convertADCBank(0x10); // Convert Bank B
 
-		// Digital Values
-		// J1 and J3
-		SGND51R_ADC = sampleADC(ADCINID_14); // Short to SGND through 51R
-		VC4_ADC = sampleADC(ADCINID_B1);
-		V2AB_ADC = sampleADC(ADCINID_B4);
-		VC3_ADC = sampleADC(ADCINID_B2);
-		V1AB_ADC = sampleADC(ADCINID_A0);
-		IL4_ADC = sampleADC(ADCINID_B0);
-		IL3_ADC = sampleADC(ADCINID_A1);
 
-		// J5 and J7
-		VDC2_ADC = sampleADC(ADCINID_15);
-		VDC1_ADC = sampleADC(ADCINID_A2);
-		IL2_ADC = sampleADC(ADCINID_A5);
-		SGND_ADC = sampleADC(ADCINID_B5); // Short to SGND
-		S1V5_ADC = sampleADC(ADCINID_A3); // Short to 1.5V
-		ANALOG_ADC = sampleADC(ADCINID_B3);
-		IL1_ADC = sampleADC(ADCINID_A4);
 
-		// Actual Values
-		V2AB_REAL = (2.0*V2AB_ADC) - 6234.0;
-//		printf("main while\n\r");
-//		printf("ADCINA0 Sample = %u\n\r", sampleADC(ADCINID_A0));
-//		printf("ADCINA1 Sample = %u\n\r", sampleADC(ADCINID_A1));
-//		printf("ADCINA2 Sample = %u\n\r", sampleADC(ADCINID_A2));
-//		printf("ADCINA3 Sample = %u\n\r", sampleADC(ADCINID_A3));
-//		printf("ADCINA4 Sample = %u\n\r", sampleADC(ADCINID_A4));
-//		printf("ADCINA5 Sample = %u\n\r", sampleADC(ADCINID_A5));
-//		printf("ADCIN14 Sample = %u\n\r", sampleADC(ADCINID_14));
-//		printf("ADCIN15 Sample = %u\n\r", sampleADC(ADCINID_15));
-//
-//		printf("ADCINB0 Sample = %u\n\r", sampleADC(ADCINID_B0));
-//		printf("ADCINB1 Sample = %u\n\r", sampleADC(ADCINID_B1));
-//		printf("ADCINB2 Sample = %u\n\r", sampleADC(ADCINID_B2));
-//		printf("ADCINB3 Sample = %u\n\r", sampleADC(ADCINID_B3));
-//		printf("ADCINB4 Sample = %u\n\r", sampleADC(ADCINID_B4));
-//		printf("ADCINB5 Sample = %u\n\r", sampleADC(ADCINID_B5));
+		haltOverVoltage();
 
-		GPIO_WritePin(LED_GPIO_RED, redLED_state);
-		redLED_state = !redLED_state;
+
+
+
+
+
+//		toggleBlueLED();
 
 		// DELAY_US(100*1);
 	} while (1);
@@ -410,34 +425,42 @@ void configureADC() {
 	//ADCINA0
 	AdcaRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINA0
 	AdcaRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC0CTL.bit.TRIGSEL = 1;
 
 	//ADCINA1
 	AdcaRegs.ADCSOC1CTL.bit.CHSEL = 0x01;  //SOC1 will convert pin ADCINA1
 	AdcaRegs.ADCSOC1CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC1CTL.bit.TRIGSEL = 1;
 
 	//ADCINA2
 	AdcaRegs.ADCSOC2CTL.bit.CHSEL = 0x02;  //SOC2 will convert pin ADCINA2
 	AdcaRegs.ADCSOC2CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC2CTL.bit.TRIGSEL = 1;
 
 	//ADCINA3
 	AdcaRegs.ADCSOC3CTL.bit.CHSEL = 0x03;  //SOC3 will convert pin ADCINA3
 	AdcaRegs.ADCSOC3CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC3CTL.bit.TRIGSEL = 1;
 
 	//ADCINA4
 	AdcaRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC4 will convert pin ADCINA4
 	AdcaRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC4CTL.bit.TRIGSEL = 1;
 
 	//ADCINA5
 	AdcaRegs.ADCSOC5CTL.bit.CHSEL = 0x05;  //SOC5 will convert pin ADCINA5
 	AdcaRegs.ADCSOC5CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC5CTL.bit.TRIGSEL = 1;
 
 	//ADCIN14
 	AdcaRegs.ADCSOC14CTL.bit.CHSEL = 0x06;  //SOC6 will convert pin ADCIN14
 	AdcaRegs.ADCSOC14CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC14CTL.bit.TRIGSEL = 1;
 
 	//ADCIN15
 	AdcaRegs.ADCSOC15CTL.bit.CHSEL = 0x07;  //SOC7 will convert pin ADCIN15
 	AdcaRegs.ADCSOC15CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC15CTL.bit.TRIGSEL = 1;
 
 	//
 	//ADCINB
@@ -449,26 +472,32 @@ void configureADC() {
 	//ADCINB0
 	AdcbRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINB0
 	AdcbRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC0CTL.bit.TRIGSEL = 1;
 
 	//ADCINB1
 	AdcbRegs.ADCSOC1CTL.bit.CHSEL = 0x01;  //SOC1 will convert pin ADCINB1
 	AdcbRegs.ADCSOC1CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC1CTL.bit.TRIGSEL = 1;
 
 	//ADCINB2
 	AdcbRegs.ADCSOC2CTL.bit.CHSEL = 0x02;  //SOC2 will convert pin ADCINB2
 	AdcbRegs.ADCSOC2CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC2CTL.bit.TRIGSEL = 1;
 
 	//ADCINB3
 	AdcbRegs.ADCSOC3CTL.bit.CHSEL = 0x03;  //SOC3 will convert pin ADCINB3
 	AdcbRegs.ADCSOC3CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC3CTL.bit.TRIGSEL = 1;
 
 	//ADCINB4
 	AdcbRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC4 will convert pin ADCINB4
 	AdcbRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC4CTL.bit.TRIGSEL = 1;
 
 	//ADCINB5
 	AdcbRegs.ADCSOC5CTL.bit.CHSEL = 0x05;  //SOC5 will convert pin ADCINB5
 	AdcbRegs.ADCSOC5CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC5CTL.bit.TRIGSEL = 1;
 
 }
 
@@ -835,6 +864,99 @@ void InitEPwm3Example()
     EPwm3Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;      // Select INT on Zero event
     EPwm3Regs.ETSEL.bit.INTEN = 1;                 // Enable INT
     EPwm3Regs.ETPS.bit.INTPRD = ET_3RD;            // Generate INT on 3rd event
+}
+
+void storeADCValues() {
+	// Digital Values
+	// J1 and J3
+	SGND51R_ADC = sampleADC(ADCINID_14); // Short to SGND through 51R
+	VC4_ADC = sampleADC(ADCINID_B1);
+	V2AB_ADC = sampleADC(ADCINID_B4);
+	VC3_ADC = sampleADC(ADCINID_B2);
+	V1AB_ADC = sampleADC(ADCINID_A0);
+	IL4_ADC = sampleADC(ADCINID_B0);
+	IL3_ADC = sampleADC(ADCINID_A1);
+
+	// J5 and J7
+	VDC2_ADC = sampleADC(ADCINID_15);
+	VDC1_ADC = sampleADC(ADCINID_A2);
+	IL2_ADC = sampleADC(ADCINID_A5);
+	SGND_ADC = sampleADC(ADCINID_B5); // Short to SGND
+	S1V5_ADC = sampleADC(ADCINID_A3); // Short to 1.5V
+	ANALOG_ADC = sampleADC(ADCINID_B3);
+	IL1_ADC = sampleADC(ADCINID_A4);
+
+	// Actual Values
+	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
+}
+
+void printAndyBoard(void) {
+	printf("Raw Values\n\r");
+	printf("ADCINA0 Sample = %u\n\r", sampleADC(ADCINID_A0));
+	printf("ADCINA1 Sample = %u\n\r", sampleADC(ADCINID_A1));
+	printf("ADCINA2 Sample = %u\n\r", sampleADC(ADCINID_A2));
+	printf("ADCINA3 Sample = %u\n\r", sampleADC(ADCINID_A3));
+	printf("ADCINA4 Sample = %u\n\r", sampleADC(ADCINID_A4));
+	printf("ADCINA5 Sample = %u\n\r", sampleADC(ADCINID_A5));
+	printf("ADCIN14 Sample = %u\n\r", sampleADC(ADCINID_14));
+	printf("ADCIN15 Sample = %u\n\r", sampleADC(ADCINID_15));
+
+	printf("ADCINB0 Sample = %u\n\r", sampleADC(ADCINID_B0));
+	printf("ADCINB1 Sample = %u\n\r", sampleADC(ADCINID_B1));
+	printf("ADCINB2 Sample = %u\n\r", sampleADC(ADCINID_B2));
+	printf("ADCINB3 Sample = %u\n\r", sampleADC(ADCINID_B3));
+	printf("ADCINB4 Sample = %u\n\r", sampleADC(ADCINID_B4));
+	printf("ADCINB5 Sample = %u\n\r", sampleADC(ADCINID_B5));
+
+	printf("Real Values\n\r");
+	printf("V2AB_Real = %.2f\n\r", V2AB_Real);
+}
+
+void haltOverVoltage(void) {
+
+}
+
+void toggleBlueLED() {
+	if (up && V2AB_Real > CMPHI) {
+		up = 0;
+		blueLED_state = !blueLED_state;
+		GPIO_WritePin(LED_GPIO_BLUE, blueLED_state);
+	}
+	else if (!up && V2AB_Real < CMPLO) {
+		up = 1;
+		blueLED_state = !blueLED_state;
+		GPIO_WritePin(LED_GPIO_BLUE, blueLED_state);
+	}
+
+}
+
+void toggleRedLED() {
+	redLED_state = !redLED_state;
+	GPIO_WritePin(LED_GPIO_RED, redLED_state);
+}
+
+__interrupt void cpu_timer0_isr(void) {
+	//toggleRedLED();
+
+	//printf("timer0\n\r");
+	storeADCValues(); // Store and Convert ADC Values in variables in memory
+	//
+	// Acknowledge this __interrupt to receive more __interrupts from group 1
+	//
+//	AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
+//	AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;
+
+	PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
+
+__interrupt void cpu_timer1_isr(void) {
+	toggleRedLED();
+
+}
+
+__interrupt void cpu_timer2_isr(void) {
+	toggleRedLED();
+
 }
 
 //
