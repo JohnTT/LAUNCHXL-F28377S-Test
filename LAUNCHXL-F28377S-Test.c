@@ -44,6 +44,11 @@
 #define LED_GPIO_RED    12
 #define LED_GPIO_BLUE	13
 
+#define PWM1_GPIO	12
+#define PWM2_GPIO	13
+#define PWM3_GPIO	14
+#define PWM4_GPIO	15
+
 #define VOLTAGE_LIMIT 300.0
 
 // Analog to Digital (ADC)
@@ -65,7 +70,7 @@ enum ADCINID {
 	ADCINID_B5 = 0x15
 };
 
-#define MOV_AVG_SIZE 128
+#define MOV_AVG_SIZE 8
 
 // EPWM
 #define EPWM1_MAX_DB   0x03FF
@@ -88,12 +93,17 @@ volatile int status = 0;
 volatile FILE *fid;
 
 // LED states
-int blueLED_state = 0;
-int redLED_state = 0;
+char blueLED_state = 0;
+char redLED_state = 0;
 
-double CMPHI = 8.0;
-double CMPLO = -8.0;
-int up = 1;
+char PWM1_state = 0;
+char PWM2_state = 0;
+char PWM3_state = 0;
+char PWM4_state = 0;
+
+float CMPHI = 8.0;
+float CMPLO = -8.0;
+char up = 1;
 
 // Analog to Digital (ADC)
 
@@ -118,24 +128,32 @@ uint16_t IL1_ADC = 0;
 
 // Actual Values
 uint16_t buf_idx = 0;
-double VC4_Real = 0;
+float VC4_Real = 0;
 
-double V2AB_Real = 0;
-double V2AB_Real_Buf[MOV_AVG_SIZE];
-double V2AB_Real_BufSum = 0;
-double V2AB_Real_Avg = 0;
+float V2AB_Real = 0;
+float V2AB_Real_Buf[MOV_AVG_SIZE];
+float V2AB_Real_BufSum = 0;
+float V2AB_Real_Avg = 0;
 
-double VC3_Real = 0;
-double V1AB_Real = 0;
-double IL4_Real = 0;
-double IL3_Real = 0;
+float VC3_Real = 0;
+float V1AB_Real = 0;
+float IL4_Real = 0;
+float IL3_Real = 0;
 
 // J5 and J7
-double VDC2_Real = 0;
-double VDC1_Real = 0;
-double IL2_Real = 0;
-double ANALOG_Real = 0;
-double IL1_Real = 0;
+float VDC2_Real = 0;
+float VDC2_Real_Buf[MOV_AVG_SIZE];
+float VDC2_Real_BufSum = 0;
+float VDC2_Real_Avg = 0;
+
+float VDC1_Real = 0;
+float VDC1_Real_Buf[MOV_AVG_SIZE];
+float VDC1_Real_BufSum = 0;
+float VDC1_Real_Avg = 0;
+
+float IL2_Real = 0;
+float ANALOG_Real = 0;
+float IL1_Real = 0;
 
 // EPWM
 Uint32 EPwm1TimerIntCount;
@@ -158,6 +176,11 @@ void printAndyBoard(void);
 
 void toggleBlueLED(void);
 void toggleRedLED(void);
+
+void togglePWM1(void);
+void togglePWM2(void);
+void togglePWM3(void);
+void togglePWM4(void);
 
 // Analog to Digital (ADC)
 void configureADC(void);
@@ -231,17 +254,17 @@ void main(void) {
 	//
 	// enable PWM1, PWM2 and PWM3
 	//
-	CpuSysRegs.PCLKCR2.bit.EPWM1 = 1;
-	CpuSysRegs.PCLKCR2.bit.EPWM2 = 1;
-	CpuSysRegs.PCLKCR2.bit.EPWM3 = 1;
+//	CpuSysRegs.PCLKCR2.bit.EPWM1 = 1;
+//	CpuSysRegs.PCLKCR2.bit.EPWM2 = 1;
+//	CpuSysRegs.PCLKCR2.bit.EPWM3 = 1;
 
 	//
 	// For this case just init GPIO pins for ePWM1, ePWM2, ePWM3
 	// These functions are in the F2837xS_EPwm.c file
 	//
-	InitEPwm1Gpio();
-	InitEPwm2Gpio();
-	InitEPwm3Gpio();
+//	InitEPwm1Gpio();
+//	InitEPwm2Gpio();
+//	InitEPwm3Gpio();
 
 	//
 	// Interrupts that are used in this example are re-mapped to
@@ -249,13 +272,13 @@ void main(void) {
 	//
 	EALLOW;
 	// This is needed to write to EALLOW protected registers
-	PieVectTable.EPWM1_INT = &epwm1_isr;
-	PieVectTable.EPWM2_INT = &epwm2_isr;
-	PieVectTable.EPWM3_INT = &epwm3_isr;
+//	PieVectTable.EPWM1_INT = &epwm1_isr;
+//	PieVectTable.EPWM2_INT = &epwm2_isr;
+//	PieVectTable.EPWM3_INT = &epwm3_isr;
 
-	PieVectTable.TIMER0_INT = &cpu_timer0_isr; // Need this for CPU Timer
-	PieVectTable.TIMER1_INT = &cpu_timer1_isr; // Need this for CPU Timer
-	PieVectTable.TIMER2_INT = &cpu_timer2_isr; // Need this for CPU Timer
+	PieVectTable.TIMER0_INT = &cpu_timer0_isr; // Need this for CPU Timer0
+	PieVectTable.TIMER1_INT = &cpu_timer1_isr; // Need this for CPU Timer1
+	PieVectTable.TIMER2_INT = &cpu_timer2_isr; // Need this for CPU Timer2
 
 	EDIS;
 	// This is needed to disable write to EALLOW protected registers
@@ -267,9 +290,9 @@ void main(void) {
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 0;
 	EDIS;
 
-	InitEPwm1Example();
-	InitEPwm2Example();
-	InitEPwm3Example();
+//	InitEPwm1Example();
+//	InitEPwm2Example();
+//	InitEPwm3Example();
 
 	EALLOW;
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -281,7 +304,7 @@ void main(void) {
 	// Configure CPU-Timer 0,1,2 to __interrupt
 	ConfigCpuTimer(&CpuTimer0, 200, 10); // lower than 10us too fast, prevents other ISR from running
 	ConfigCpuTimer(&CpuTimer1, 200, 500000);
-	ConfigCpuTimer(&CpuTimer2, 200, 250000);
+	ConfigCpuTimer(&CpuTimer2, 200, 1000000);
 
 	//
 	// To ensure precise timing, use write-only instructions to write to the entire
@@ -297,15 +320,15 @@ void main(void) {
 	// Step 5. User specific code, enable interrupts:
 	// Initialize counters:
 	//
-	EPwm1TimerIntCount = 0;
-	EPwm2TimerIntCount = 0;
-	EPwm3TimerIntCount = 0;
+//	EPwm1TimerIntCount = 0;
+//	EPwm2TimerIntCount = 0;
+//	EPwm3TimerIntCount = 0;
 
 	//
 	// Enable CPU INT1, INT13, INT14 which is connected to CPU-Timer 0, 1, 2:
 	//
 	IER |= M_INT1; // Enable CPU Timer 0 Interrupts
-	//IER |= M_INT13; // Enable CPU Timer 1 Interrupts
+	IER |= M_INT13; // Enable CPU Timer 1 Interrupts
 	IER |= M_INT14; // Enable CPU Timer 2 Interrupts
 
 	//
@@ -321,7 +344,8 @@ void main(void) {
 
 
 	// User Configuration Functions
-	configureLEDs();
+	//configureLEDs();
+	//configureGateDrivers();
 	configureADC();
 	configureSCIprintf();
 
@@ -360,15 +384,43 @@ void scia_init() {
 }
 
 void configureLEDs() {
-	GPIO_SetupPinMux(LED_GPIO_RED, GPIO_MUX_CPU1, 0);
-	GPIO_SetupPinOptions(LED_GPIO_RED, GPIO_OUTPUT, GPIO_PUSHPULL);
-
+	// Pin 12 - Blue LED
 	GPIO_SetupPinMux(LED_GPIO_BLUE, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(LED_GPIO_BLUE, GPIO_OUTPUT, GPIO_PUSHPULL);
-
-	GPIO_WritePin(LED_GPIO_RED, 1);
 	GPIO_WritePin(LED_GPIO_BLUE, 1);
 
+	// Pin 13 - Red LED
+	GPIO_SetupPinMux(LED_GPIO_RED, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(LED_GPIO_RED, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(LED_GPIO_RED, 1);
+
+	// Ken Drives
+	// PWM1+
+	GPIO_SetupPinMux(LED_GPIO_RED, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(LED_GPIO_RED, GPIO_OUTPUT, GPIO_PUSHPULL);
+}
+
+void configureGateDrivers() {
+	// Ken Drives
+	// PWM1+
+	GPIO_SetupPinMux(PWM1_GPIO, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(PWM1_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(PWM1_GPIO, 0);
+
+	// PWM2+
+	GPIO_SetupPinMux(PWM2_GPIO, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(PWM2_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(PWM2_GPIO, 0);
+
+	// PWM3+
+	GPIO_SetupPinMux(PWM3_GPIO, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(PWM3_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(PWM3_GPIO, 0);
+
+	// PWM4+
+	GPIO_SetupPinMux(PWM4_GPIO, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(PWM4_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(PWM4_GPIO, 0);
 }
 
 void configureSCIprintf() {
@@ -393,6 +445,8 @@ void configureADC() {
 	int idx;
 	for (idx = 0; idx < MOV_AVG_SIZE; idx++) {
 		V2AB_Real_Buf[idx] = 0;
+		VDC1_Real_Buf[idx] = 0;
+		VDC2_Real_Buf[idx] = 0;
 	}
 
 	// ADC1 configuation
@@ -893,7 +947,9 @@ void storeADCValues() {
 	IL1_ADC = sampleADC(ADCINID_A4);
 
 	// Actual Values
-	V2AB_Real = (2.0 * V2AB_ADC) - 6236.0;
+	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
+	VDC1_Real = 2.0*VDC1_ADC-426.0;
+	VDC2_Real = VDC2_ADC - 218.0;
 }
 
 void printAndyBoard(void) {
@@ -931,11 +987,11 @@ void haltOverVoltage(void) {
 }
 
 void hysteresisControl() {
-	if (up && (V2AB_Real_Avg > 10.0)) {
+	if (up && (V2AB_Real_Avg >= 9.0)) {
 		up = 0;
 		toggleBlueLED();
 	}
-	else if ((!up) && (V2AB_Real_Avg < -10.0)) {
+	else if ((!up) && (V2AB_Real_Avg <= -9.0)) {
 		up = 1;
 		toggleBlueLED();
 	}
@@ -951,12 +1007,32 @@ void toggleRedLED() {
 	GPIO_WritePin(LED_GPIO_RED, redLED_state);
 }
 
+void togglePWM1() {
+	PWM1_state = !PWM1_state;
+	GPIO_WritePin(PWM1_GPIO, PWM1_state);
+}
+
+void togglePWM2() {
+	PWM2_state = !PWM2_state;
+	GPIO_WritePin(PWM2_GPIO, PWM2_state);
+}
+
+void togglePWM3() {
+	PWM3_state = !PWM3_state;
+	GPIO_WritePin(PWM3_GPIO, PWM3_state);
+}
+
+void togglePWM4() {
+	PWM4_state = !PWM4_state;
+	GPIO_WritePin(PWM4_GPIO, PWM4_state);
+}
+
 __interrupt void cpu_timer0_isr(void) {
 	//printf("timer0\n\r");
 
 	storeADCValues(); // Store and Convert ADC Values in variables in memory
 	movingAvgADC();
-	haltOverVoltage();
+	// haltOverVoltage();
 
 	hysteresisControl();
 
@@ -968,22 +1044,39 @@ __interrupt void cpu_timer0_isr(void) {
 __interrupt void cpu_timer1_isr(void) {
 	//printf("timer1\n\r");
 
-	toggleRedLED();
+	togglePWM1();
+	togglePWM3();
 }
 
 __interrupt void cpu_timer2_isr(void) {
 	//printf("timer2\n\r");
 
-	toggleRedLED();
+	togglePWM2();
+	togglePWM4();
 }
 
 void movingAvgADC() {
 	if (buf_idx >= MOV_AVG_SIZE)
 		buf_idx = 0;
+
+	// V2AB
 	V2AB_Real_BufSum -= V2AB_Real_Buf[buf_idx];
 	V2AB_Real_Buf[buf_idx] = V2AB_Real;
 	V2AB_Real_BufSum += V2AB_Real_Buf[buf_idx];
 	V2AB_Real_Avg = V2AB_Real_BufSum / MOV_AVG_SIZE;
+
+	// VDC1
+	VDC1_Real_BufSum -= VDC1_Real_Buf[buf_idx];
+	VDC1_Real_Buf[buf_idx] = VDC1_Real;
+	VDC1_Real_BufSum += VDC1_Real_Buf[buf_idx];
+	VDC1_Real_Avg = VDC1_Real_BufSum / MOV_AVG_SIZE;
+
+	// VDC2
+	VDC2_Real_BufSum -= VDC2_Real_Buf[buf_idx];
+	VDC2_Real_Buf[buf_idx] = VDC1_Real;
+	VDC2_Real_BufSum += VDC2_Real_Buf[buf_idx];
+	VDC2_Real_Avg = VDC2_Real_BufSum / MOV_AVG_SIZE;
+
 	buf_idx++;
 }
 
