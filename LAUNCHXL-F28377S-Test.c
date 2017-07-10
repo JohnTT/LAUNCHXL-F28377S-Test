@@ -76,17 +76,6 @@ enum ADCINID {
 
 #define MOV_AVG_SIZE 8
 
-// EPWM
-#define EPWM1_MAX_DB   0x03FF
-#define EPWM2_MAX_DB   0x03FF
-#define EPWM3_MAX_DB   0x03FF
-#define EPWM1_MIN_DB   0
-#define EPWM2_MIN_DB   0
-#define EPWM3_MIN_DB   0
-#define DB_UP          1
-#define DB_DOWN        0
-
-
 //
 // Globals
 //
@@ -123,11 +112,6 @@ float CMPLO = -8.0;
 char up = 1;
 
 // Analog to Digital (ADC)
-
-double FPWM = 10000.0;
-double TPWM;
-double TBCLK;
-double TBPRD;
 
 // Digital Values
 // J1 and J3
@@ -178,13 +162,20 @@ float ANALOG_Real = 0;
 float IL1_Real = 0;
 
 // EPWM
-Uint32 EPwm1TimerIntCount;
-Uint32 EPwm2TimerIntCount;
-Uint32 EPwm3TimerIntCount;
-Uint16 EPwm1_DB_Direction;
-Uint16 EPwm2_DB_Direction;
-Uint16 EPwm3_DB_Direction;
+#define EPWM1_MIN_DB   0
+#define EPWM2_MIN_DB   0x07FF
+#define EPWM3_MIN_DB	0
 
+#define EPWM7_MIN_DB   0x07FF
+
+#define EPWMCLK 200000000 // 200MHz
+
+double FPWM = 120.0;
+double TPWM;
+double TBCLK;
+double TBPRD;
+
+long EPwm2TimerIntCount = 0;
 //
 // Function Prototypes
 //
@@ -226,10 +217,11 @@ void hysteresisControl(void);
 void InitEPwm1Example(void);
 void InitEPwm2Example(void);
 void InitEPwm3Example(void);
+void InitEPwm7Example(void);
 __interrupt void epwm1_isr(void);
 __interrupt void epwm2_isr(void);
 __interrupt void epwm3_isr(void);
-
+__interrupt void epwm7_isr(void);
 
 // CPU Timers
 __interrupt void cpu_timer0_isr(void);
@@ -279,6 +271,7 @@ void main(void) {
 	CpuSysRegs.PCLKCR2.bit.EPWM1 = 1;
 	CpuSysRegs.PCLKCR2.bit.EPWM2 = 1;
 	CpuSysRegs.PCLKCR2.bit.EPWM3 = 1;
+	CpuSysRegs.PCLKCR2.bit.EPWM7 = 1;
 
 	//
 	// For this case just init GPIO pins for ePWM1, ePWM2, ePWM3
@@ -287,7 +280,7 @@ void main(void) {
 	//InitEPwm1Gpio();
 	InitEPwm2Gpio();
 	//InitEPwm3Gpio();
-
+	InitEPwm7Gpio();
 	//
 	// Interrupts that are used in this example are re-mapped to
 	// ISR functions found within this file.
@@ -315,6 +308,7 @@ void main(void) {
 //	InitEPwm1Example();
 	InitEPwm2Example();
 //	InitEPwm3Example();
+	InitEPwm7Example();
 
 	EALLOW;
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -359,6 +353,7 @@ void main(void) {
 //	PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
 	PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
 //	PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
+	PieCtrlRegs.PIEIER3.bit.INTx7 = 1;
 
 	// Enable Timer0 Interrupt, TINT0 in the PIE: Group 1 __interrupt 7
 	PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
@@ -654,222 +649,74 @@ uint16_t sampleADC(uint16_t id) {
 }
 
 
-//
-// epwm1_isr - EPWM1 ISR
-//
-__interrupt void epwm1_isr(void)
-{
-    if(EPwm1_DB_Direction == DB_UP)
-    {
-        if(EPwm1Regs.DBFED.bit.DBFED < EPWM1_MAX_DB)
-        {
-            EPwm1Regs.DBFED.bit.DBFED++;
-            EPwm1Regs.DBRED.bit.DBRED++;
-        }
-        else
-        {
-            EPwm1_DB_Direction = DB_DOWN;
-            EPwm1Regs.DBFED.bit.DBFED--;
-            EPwm1Regs.DBRED.bit.DBRED--;
-        }
-    }
-    else
-    {
-        if(EPwm1Regs.DBFED.bit.DBFED == EPWM1_MIN_DB)
-        {
-            EPwm1_DB_Direction = DB_UP;
-            EPwm1Regs.DBFED.bit.DBFED++;
-            EPwm1Regs.DBRED.bit.DBRED++;
-        }
-        else
-        {
-            EPwm1Regs.DBFED.bit.DBFED--;
-            EPwm1Regs.DBRED.bit.DBRED--;
-        }
-    }
-    EPwm1TimerIntCount++;
 
-    //
-    // Clear INT flag for this timer
-    //
-    EPwm1Regs.ETCLR.bit.INT = 1;
+//
+// epwm2_isr - EPWM2 ISR
+//
+__interrupt void epwm2_isr(void) {
+    EPwm2TimerIntCount++;
 
-    //
-    // Acknowledge this interrupt to receive more interrupts from group 3
-    //
+    EPwm2Regs.ETCLR.bit.INT = 1;
+
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
 }
 
 //
 // epwm2_isr - EPWM2 ISR
 //
-__interrupt void epwm2_isr(void)
-{
-    if(EPwm2_DB_Direction == DB_UP)
-    {
-        if(EPwm2Regs.DBFED.bit.DBFED < EPWM2_MAX_DB)
-        {
-            EPwm2Regs.DBFED.bit.DBFED++;
-            EPwm2Regs.DBRED.bit.DBRED++;
-        }
-        else
-        {
-            EPwm2_DB_Direction = DB_DOWN;
-            EPwm2Regs.DBFED.bit.DBFED--;
-            EPwm2Regs.DBRED.bit.DBRED--;
-        }
-    }
-    else
-    {
-        if(EPwm2Regs.DBFED.bit.DBFED == EPWM2_MIN_DB)
-        {
-            EPwm2_DB_Direction = DB_UP;
-            EPwm2Regs.DBFED.bit.DBFED++;
-            EPwm2Regs.DBRED.bit.DBRED++;
-        }
-        else
-        {
-            EPwm2Regs.DBFED.bit.DBFED--;
-            EPwm2Regs.DBRED.bit.DBRED--;
-        }
-    }
+__interrupt void epwm7_isr(void) {
+    EPwm7Regs.ETCLR.bit.INT = 1;
 
-    EPwm2TimerIntCount++;
-
-    //
-    // Clear INT flag for this timer
-    //
-    EPwm2Regs.ETCLR.bit.INT = 1;
-
-    //
-    // Acknowledge this interrupt to receive more interrupts from group 3
-    //
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP7;
 }
 
-//
-// epwm3_isr - EPWM3 ISR
-//
-__interrupt void epwm3_isr(void)
-{
-    if(EPwm3_DB_Direction == DB_UP)
-    {
-        if(EPwm3Regs.DBFED.bit.DBFED < EPWM3_MAX_DB)
-        {
-            EPwm3Regs.DBFED.bit.DBFED++;
-            EPwm3Regs.DBRED.bit.DBRED++;
-        }
-        else
-        {
-            EPwm3_DB_Direction = DB_DOWN;
-            EPwm3Regs.DBFED.bit.DBFED--;
-            EPwm3Regs.DBRED.bit.DBRED--;
-        }
-    }
-    else
-    {
-        if(EPwm3Regs.DBFED.bit.DBFED == EPWM3_MIN_DB)
-        {
-            EPwm3_DB_Direction = DB_UP;
-            EPwm3Regs.DBFED.bit.DBFED++;
-            EPwm3Regs.DBRED.bit.DBRED++;
-        }
-        else
-        {
-            EPwm3Regs.DBFED.bit.DBFED--;
-            EPwm3Regs.DBRED.bit.DBRED--;
-        }
-    }
 
-    EPwm3TimerIntCount++;
 
-    //
-    // Clear INT flag for this timer
-    //
-    EPwm3Regs.ETCLR.bit.INT = 1;
-
-    //
-    // Acknowledge this interrupt to receive more interrupts from group 3
-    //
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-}
-
-//
-// InitEPwm1Example - Initialize EPWM1 configuration
-//
-void InitEPwm1Example()
-{
-    EPwm1Regs.TBPRD = 6000;                       // Set timer period
-    EPwm1Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
-    EPwm1Regs.TBCTR = 0x0000;                     // Clear counter
-
-    //
-    // Setup TBCLK
-    //
-    EPwm1Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-    EPwm1Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
-    EPwm1Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
-    EPwm1Regs.TBCTL.bit.CLKDIV = TB_DIV4;
-
-    EPwm1Regs.CMPCTL.bit.SHDWAMODE = CC_SHADOW;    // Load registers every ZERO
-    EPwm1Regs.CMPCTL.bit.SHDWBMODE = CC_SHADOW;
-    EPwm1Regs.CMPCTL.bit.LOADAMODE = CC_CTR_ZERO;
-    EPwm1Regs.CMPCTL.bit.LOADBMODE = CC_CTR_ZERO;
-
-    //
-    // Setup compare
-    //
-    EPwm1Regs.CMPA.bit.CMPA = 3000;
-
-    //
-    // Set actions
-    //
-    EPwm1Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM1A on Zero
-    EPwm1Regs.AQCTLA.bit.CAD = AQ_CLEAR;
-
-    EPwm1Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM1A on Zero
-    EPwm1Regs.AQCTLB.bit.CAD = AQ_SET;
-
-    //
-    // Active Low PWMs - Setup Deadband
-    //
-    EPwm1Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm1Regs.DBCTL.bit.POLSEL = DB_ACTV_LO;
-    EPwm1Regs.DBCTL.bit.IN_MODE = DBA_ALL;
-    EPwm1Regs.DBRED.bit.DBRED = EPWM1_MIN_DB;
-    EPwm1Regs.DBFED.bit.DBFED = EPWM1_MIN_DB;
-    EPwm1_DB_Direction = DB_UP;
-
-    //
-    // Interrupt where we will change the Deadband
-    //
-    EPwm1Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;    // Select INT on Zero event
-    EPwm1Regs.ETSEL.bit.INTEN = 1;               // Enable INT
-    EPwm1Regs.ETPS.bit.INTPRD = ET_3RD;          // Generate INT on 3rd event
-}
 
 //
 // InitEPwm2Example - Initialize EPWM2 configuration
 //
 void InitEPwm2Example()
 {
-	double EPWMCLK = 200000000;
-	TPWM = 1 / (FPWM);
-	TBCLK = 1.0 / EPWMCLK;
-	TBPRD = TPWM / (2.0 * TBCLK);
-	EPwm2Regs.TBPRD = TBPRD;
-    //EPwm2Regs.TBPRD = 1000;                       // Set timer period
-    EPwm2Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
-    EPwm2Regs.TBCTR = 0x0000;                     // Clear counter
-
+	int HSPCLKDIV;
+	int CLKDIV;
     //
     // Setup TBCLK
     //
     EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
     EPwm2Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
-    EPwm2Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;       // Clock ratio to SYSCLKOUT
-    EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV1;          // Slow just to observe on
+    EPwm2Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
+    EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV4;          // Slow just to observe on
                                                    // the scope
+    switch (EPwm2Regs.TBCTL.bit.HSPCLKDIV) {
+	case TB_DIV1:
+		HSPCLKDIV = 1;
+		break;
+	case TB_DIV2:
+		HSPCLKDIV = 2;
+		break;
+	case TB_DIV4:
+		HSPCLKDIV = 4;
+		break;
+    }
+    switch (EPwm2Regs.TBCTL.bit.CLKDIV) {
+    	case TB_DIV1:
+    		CLKDIV = 1;
+    		break;
+    	case TB_DIV2:
+    		CLKDIV = 2;
+    		break;
+    	case TB_DIV4:
+    		CLKDIV = 4;
+    		break;
+        }
+    TPWM = 1 / (FPWM);
+	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
+	TBPRD = TPWM / (2.0 * TBCLK);
+	EPwm2Regs.TBPRD = TBPRD; // Set timer period
+	EPwm2Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
+	EPwm2Regs.TBCTR = 0x0000;                     // Clear counter
+
 
     //
     // Setup compare
@@ -889,11 +736,10 @@ void InitEPwm2Example()
     // Active Low complementary PWMs - setup the deadband
     //
     EPwm2Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm2Regs.DBCTL.bit.POLSEL = DB_ACTV_LOC;
+    EPwm2Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
     EPwm2Regs.DBCTL.bit.IN_MODE = DBA_ALL;
     EPwm2Regs.DBRED.bit.DBRED = EPWM2_MIN_DB;
     EPwm2Regs.DBFED.bit.DBFED = EPWM2_MIN_DB;
-    EPwm2_DB_Direction = DB_UP;
 
     //
     // Interrupt where we will modify the deadband
@@ -904,54 +750,81 @@ void InitEPwm2Example()
 }
 
 //
-// InitEPwm3Example - Initialize EPWM3 configuration
+// InitEPwm7Example - Initialize EPWM7 configuration
 //
-void InitEPwm3Example()
+void InitEPwm7Example()
 {
-    EPwm3Regs.TBPRD = 6000;                        // Set timer period
-    EPwm3Regs.TBPHS.bit.TBPHS = 0x0000;            // Phase is 0
-    EPwm3Regs.TBCTR = 0x0000;                      // Clear counter
-
+	int HSPCLKDIV;
+	int CLKDIV;
     //
     // Setup TBCLK
     //
-    EPwm3Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-    EPwm3Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
-    EPwm3Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
-    EPwm3Regs.TBCTL.bit.CLKDIV = TB_DIV4;          // Slow so we can observe on
+    EPwm7Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
+    EPwm7Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
+    EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
+    EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV4;          // Slow just to observe on
                                                    // the scope
+    switch (EPwm7Regs.TBCTL.bit.HSPCLKDIV) {
+	case TB_DIV1:
+		HSPCLKDIV = 1;
+		break;
+	case TB_DIV2:
+		HSPCLKDIV = 2;
+		break;
+	case TB_DIV4:
+		HSPCLKDIV = 4;
+		break;
+    }
+    switch (EPwm7Regs.TBCTL.bit.CLKDIV) {
+    	case TB_DIV1:
+    		CLKDIV = 1;
+    		break;
+    	case TB_DIV2:
+    		CLKDIV = 2;
+    		break;
+    	case TB_DIV4:
+    		CLKDIV = 4;
+    		break;
+        }
+    TPWM = 1 / (FPWM);
+	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
+	TBPRD = TPWM / (2.0 * TBCLK);
+	EPwm7Regs.TBPRD = TBPRD; // Set timer period
+	EPwm7Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
+	EPwm7Regs.TBCTR = 0x0000;                     // Clear counter
+
 
     //
     // Setup compare
     //
-    EPwm3Regs.CMPA.bit.CMPA = 3000;
+    EPwm7Regs.CMPA.bit.CMPA = 0.5 * EPwm7Regs.TBPRD;
 
     //
     // Set actions
     //
-    EPwm3Regs.AQCTLA.bit.CAU = AQ_SET;             // Set PWM3A on Zero
-    EPwm3Regs.AQCTLA.bit.CAD = AQ_CLEAR;
+    EPwm7Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
+    EPwm7Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 
-    EPwm3Regs.AQCTLB.bit.CAU = AQ_CLEAR;           // Set PWM3A on Zero
-    EPwm3Regs.AQCTLB.bit.CAD = AQ_SET;
-
-    //
-    // Active high complementary PWMs - Setup the deadband
-    //
-    EPwm3Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm3Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
-    EPwm3Regs.DBCTL.bit.IN_MODE = DBA_ALL;
-    EPwm3Regs.DBRED.bit.DBRED = EPWM3_MIN_DB;
-    EPwm3Regs.DBFED.bit.DBFED = EPWM3_MIN_DB;
-    EPwm3_DB_Direction = DB_UP;
+    EPwm7Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
+    EPwm7Regs.AQCTLB.bit.CAD = AQ_SET;
 
     //
-    // Interrupt where we will change the deadband
+    // Active Low complementary PWMs - setup the deadband
     //
-    EPwm3Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;      // Select INT on Zero event
-    EPwm3Regs.ETSEL.bit.INTEN = 1;                 // Enable INT
-    EPwm3Regs.ETPS.bit.INTPRD = ET_3RD;            // Generate INT on 3rd event
+    EPwm7Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+    EPwm7Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
+    EPwm7Regs.DBCTL.bit.IN_MODE = DBA_ALL;
+    EPwm7Regs.DBRED.bit.DBRED = EPWM7_MIN_DB;
+    EPwm7Regs.DBFED.bit.DBFED = EPWM7_MIN_DB;
+
+    //
+    // Interrupt where we will modify the deadband
+    //
+    EPwm7Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
+    EPwm7Regs.ETSEL.bit.INTEN = 1;                // Enable INT
+    EPwm7Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
 }
+
 
 void storeADCValues() {
 //	// Digital Values
