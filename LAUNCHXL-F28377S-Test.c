@@ -40,11 +40,12 @@
 // Defines
 //
 
-// General
+// Timers
 #define CPU_TIMER0_PERIOD 1 // us
 #define CPU_TIMER1_PERIOD 1 // us
 #define CPU_TIMER2_PERIOD 1 // us
 
+// GPIO Pins
 #define LED_GPIO_RED    12
 #define LED_GPIO_BLUE	13
 
@@ -53,9 +54,14 @@
 #define PWM3_GPIO	14
 #define PWM4_GPIO	15
 
-#define VOLTAGE_LIMIT 300.0
+// Over-voltage / Over-current Limit
+#define VDC1_LIMIT 9.0
+#define VDC2_LIMIT 9.0
+#define V2AB_LIMIT 9.0
 
 // Analog to Digital (ADC)
+#define MOV_AVG_SIZE 512
+
 enum ADCINID {
 	ADCINID_A0 = 0x00,
 	ADCINID_A1 = 0x01,
@@ -74,44 +80,39 @@ enum ADCINID {
 	ADCINID_B5 = 0x15
 };
 
-#define MOV_AVG_SIZE 8
+
+// EPWM
+#define EPWMCLK 200000000 // 200MHz
+#define DB_TIME 0.000004 // 4uS
+
 
 //
 // Globals
 //
 
-// General
 // FILE -> printf variables
 volatile int status = 0;
 volatile FILE *fid;
 
-// LED states
+// GPIO LED pin states
 char blueLED_state = 0;
 char redLED_state = 0;
 
-
-// GPIO PWM
+// GPIO PWM pin states
 char PWM1_state = 0;
 char PWM2_state = 0;
 char PWM3_state = 0;
 char PWM4_state = 0;
 
-unsigned long PWM1_count = 1;
-unsigned long PWM2_count = 1;
-unsigned long PWM3_count = 1;
-unsigned long PWM4_count = 1;
-
-unsigned long PWM1_multiple = 1;
-unsigned long PWM2_multiple = 1;
-unsigned long PWM3_multiple = 1;
-unsigned long PWM4_multiple = 1;
-
-// Hysteresis
+// Hysteresis Limits
 float CMPHI = 8.0;
 float CMPLO = -8.0;
 char up = 1;
 
+
+//
 // Analog to Digital (ADC)
+//
 
 // Digital Values
 // J1 and J3
@@ -162,36 +163,28 @@ float ANALOG_Real = 0;
 float IL1_Real = 0;
 
 // EPWM
-#define EPWM1_MIN_DB   0
-#define EPWM2_MIN_DB   0x07FF
-#define EPWM3_MIN_DB	0
+double EPWM7_Freq = 60.0 * 2.0;
+double EPWM7_Duty = 0.8;
 
-#define EPWM7_MIN_DB   0x07FF
+double EPWM8_Freq = 120.0 * 2.0;
+double EPWM8_Duty = 0.5;
 
-#define EPWMCLK 200000000 // 200MHz
 
-double FPWM = 120.0;
-double TPWM;
-double TBCLK;
-double TBPRD;
-
-long EPwm2TimerIntCount = 0;
 //
 // Function Prototypes
 //
 
 // General
 extern void DSP28x_usDelay(Uint32 Count);
-void configureLEDs(void);
 void scia_init(void);
-void configureSCIprintf(void);
+void init_LEDs(void);
+void init_printf(void);
 void printAndyBoard(void);
-
 void toggleBlueLED(void);
 void toggleRedLED(void);
 
 // GPIO-PWM Functions
-void GPIOGateDrivers(void);
+void init_GPIOPWM(void);
 void toggleGPIOPWM1(void);
 void toggleGPIOPWM2(void);
 void toggleGPIOPWM3(void);
@@ -204,24 +197,23 @@ void setGPIOPWM4Freq(double freq);
 
 
 // Analog to Digital (ADC)
-void configureADC(void);
-uint16_t sampleADC(uint16_t id);
+void init_ADC(void);
 void convertADCBank(uint16_t id);
 void storeADCValues(void);
 void movingAvgADC(void);
 
 void haltOverVoltage(void);
+char checkVDC1(void);
+char checkVDC2(void);
+char checkV2AB(void);
+
 void hysteresisControl(void);
 
 // EPWM
-void InitEPwm1Example(void);
-void InitEPwm2Example(void);
-void InitEPwm3Example(void);
 void InitEPwm7Example(void);
-__interrupt void epwm1_isr(void);
-__interrupt void epwm2_isr(void);
-__interrupt void epwm3_isr(void);
+void InitEPwm8Example(void);
 __interrupt void epwm7_isr(void);
+__interrupt void epwm8_isr(void);
 
 // CPU Timers
 __interrupt void cpu_timer0_isr(void);
@@ -266,30 +258,26 @@ void main(void) {
 	// EPWM
 
 	//
-	// enable PWM1, PWM2 and PWM3
+	// enable PWM7 and PWM8
 	//
-	CpuSysRegs.PCLKCR2.bit.EPWM1 = 1;
-	CpuSysRegs.PCLKCR2.bit.EPWM2 = 1;
-	CpuSysRegs.PCLKCR2.bit.EPWM3 = 1;
 	CpuSysRegs.PCLKCR2.bit.EPWM7 = 1;
+	CpuSysRegs.PCLKCR2.bit.EPWM8 = 1;
 
 	//
 	// For this case just init GPIO pins for ePWM1, ePWM2, ePWM3
 	// These functions are in the F2837xS_EPwm.c file
 	//
-	//InitEPwm1Gpio();
-	InitEPwm2Gpio();
-	//InitEPwm3Gpio();
 	InitEPwm7Gpio();
+	InitEPwm8Gpio();
+
 	//
 	// Interrupts that are used in this example are re-mapped to
 	// ISR functions found within this file.
 	//
 	EALLOW;
 	// This is needed to write to EALLOW protected registers
-//	PieVectTable.EPWM1_INT = &epwm1_isr;
-	PieVectTable.EPWM2_INT = &epwm2_isr;
-//	PieVectTable.EPWM3_INT = &epwm3_isr;
+//	PieVectTable.EPWM7_INT = &epwm7_isr;
+//	PieVectTable.EPWM8_INT = &epwm8_isr;
 
 	PieVectTable.TIMER0_INT = &cpu_timer0_isr; // Need this for CPU Timer0
 	PieVectTable.TIMER1_INT = &cpu_timer1_isr; // Need this for CPU Timer1
@@ -305,10 +293,8 @@ void main(void) {
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 0;
 	EDIS;
 
-//	InitEPwm1Example();
-	InitEPwm2Example();
-//	InitEPwm3Example();
 	InitEPwm7Example();
+	InitEPwm8Example();
 
 	EALLOW;
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -334,11 +320,7 @@ void main(void) {
 
 	//
 	// Step 5. User specific code, enable interrupts:
-	// Initialize counters:
 	//
-//	EPwm1TimerIntCount = 0;
-	EPwm2TimerIntCount = 0;
-//	EPwm3TimerIntCount = 0;
 
 	//
 	// Enable CPU INT1, INT13, INT14 which is connected to CPU-Timer 0, 1, 2:
@@ -347,23 +329,22 @@ void main(void) {
 	// IER |= M_INT13; // Enable CPU Timer 1 Interrupts
 	// IER |= M_INT14; // Enable CPU Timer 2 Interrupts
 
-	//
-	// Enable EPWM INTn in the PIE: Group 3 interrupt 1-3
-	//
-//	PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
-	PieCtrlRegs.PIEIER3.bit.INTx2 = 1;
-//	PieCtrlRegs.PIEIER3.bit.INTx3 = 1;
-	PieCtrlRegs.PIEIER3.bit.INTx7 = 1;
-
 	// Enable Timer0 Interrupt, TINT0 in the PIE: Group 1 __interrupt 7
 	PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
+
+
+	//
+	// Enable EPWM INTn in the PIE: Group 3 interrupt 1-11
+	//
+//	PieCtrlRegs.PIEIER3.bit.INTx7 = 1; // Interrupt on EPWM7
+//	PieCtrlRegs.PIEIER3.bit.INTx8 = 1; // Interrupt on EPWM8
 
 
 	// User Configuration Functions
 	//configureLEDs();
 	// GPIOGateDrivers();
-	configureADC();
-	configureSCIprintf();
+	init_ADC();
+	init_printf();
 
 	EINT;// Enable Global interrupt INTM
 	ERTM;// Enable Global realtime interrupt DBGM
@@ -372,13 +353,21 @@ void main(void) {
 	do {
 
 //		toggleBlueLED();
-
-		// DELAY_US(100*1);
+//		if (EPWM7_Up) {
+//			EPWM7_Duty += 0.01;
+//			if (EPWM7_Duty >= 0.9)
+//				EPWM7_Up = 0;
+//		} else {
+//			EPWM7_Duty -= 0.01;
+//			if (EPWM7_Duty <= 0.05)
+//				EPWM7_Up = 1;
+//		}
+//		EPwm7Regs.CMPA.bit.CMPA = EPWM7_Duty * EPwm7Regs.TBPRD;
+//		DELAY_US(1000*10);
 	} while (1);
 }
 
 void scia_init() {
-
 	// Note: Clocks were turned on to the SCIA peripheral
 	// in the InitSysCtrl() function
 
@@ -399,7 +388,7 @@ void scia_init() {
 	return;
 }
 
-void configureLEDs() {
+void init_LEDs() {
 	// Pin 12 - Blue LED
 	GPIO_SetupPinMux(LED_GPIO_BLUE, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(LED_GPIO_BLUE, GPIO_OUTPUT, GPIO_PUSHPULL);
@@ -411,36 +400,31 @@ void configureLEDs() {
 	GPIO_WritePin(LED_GPIO_RED, 1);
 }
 
-void GPIOGateDrivers() {
+void init_GPIOPWM() {
 	// Ken Drives
 	// PWM1+
 	InitGpio();
 	GPIO_SetupPinMux(PWM1_GPIO, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(PWM1_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	setGPIOPWM1Freq(10000.0);
 	GPIO_WritePin(PWM1_GPIO, 0);
 
 	// PWM2+
 	GPIO_SetupPinMux(PWM2_GPIO, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(PWM2_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	setGPIOPWM2Freq(20000.0);
 	GPIO_WritePin(PWM2_GPIO, 0);
 
 	// PWM3+
 	GPIO_SetupPinMux(PWM3_GPIO, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(PWM3_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	setGPIOPWM3Freq(30000.0);
 	GPIO_WritePin(PWM3_GPIO, 0);
 
 	// PWM4+
 	GPIO_SetupPinMux(PWM4_GPIO, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(PWM4_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	setGPIOPWM4Freq(40000.0);
 	GPIO_WritePin(PWM4_GPIO, 0);
-
 }
 
-void configureSCIprintf() {
+void init_printf() {
 	EALLOW;
 	GpioCtrlRegs.GPCMUX2.bit.GPIO84 = 1;
 	GpioCtrlRegs.GPCMUX2.bit.GPIO85 = 1;
@@ -457,7 +441,7 @@ void configureSCIprintf() {
 	setvbuf(stdout, NULL, _IONBF, 0);
 }
 
-void configureADC() {
+void init_ADC() {
 	// Initialize Moving Average Arrays
 	int idx;
 	for (idx = 0; idx < MOV_AVG_SIZE; idx++) {
@@ -502,42 +486,42 @@ void configureADC() {
 	//ADCINA0
 	AdcaRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINA0
 	AdcaRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC0CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC0CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA1
 	AdcaRegs.ADCSOC1CTL.bit.CHSEL = 0x01;  //SOC1 will convert pin ADCINA1
 	AdcaRegs.ADCSOC1CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC1CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC1CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA2
 	AdcaRegs.ADCSOC2CTL.bit.CHSEL = 0x02;  //SOC2 will convert pin ADCINA2
 	AdcaRegs.ADCSOC2CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC2CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC2CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA3
 	AdcaRegs.ADCSOC3CTL.bit.CHSEL = 0x03;  //SOC3 will convert pin ADCINA3
 	AdcaRegs.ADCSOC3CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC3CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC3CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA4
 	AdcaRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC4 will convert pin ADCINA4
 	AdcaRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC4CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC4CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA5
 	AdcaRegs.ADCSOC5CTL.bit.CHSEL = 0x05;  //SOC5 will convert pin ADCINA5
 	AdcaRegs.ADCSOC5CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC5CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC5CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCIN14
 	AdcaRegs.ADCSOC14CTL.bit.CHSEL = 0x06;  //SOC6 will convert pin ADCIN14
 	AdcaRegs.ADCSOC14CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC14CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC14CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCIN15
 	AdcaRegs.ADCSOC15CTL.bit.CHSEL = 0x07;  //SOC7 will convert pin ADCIN15
 	AdcaRegs.ADCSOC15CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC15CTL.bit.TRIGSEL = 1;
+	AdcaRegs.ADCSOC15CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//
 	//ADCINB
@@ -549,32 +533,32 @@ void configureADC() {
 	//ADCINB0
 	AdcbRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINB0
 	AdcbRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcbRegs.ADCSOC0CTL.bit.TRIGSEL = 1;
+	AdcbRegs.ADCSOC0CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB1
 	AdcbRegs.ADCSOC1CTL.bit.CHSEL = 0x01;  //SOC1 will convert pin ADCINB1
 	AdcbRegs.ADCSOC1CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcbRegs.ADCSOC1CTL.bit.TRIGSEL = 1;
+	AdcbRegs.ADCSOC1CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB2
 	AdcbRegs.ADCSOC2CTL.bit.CHSEL = 0x02;  //SOC2 will convert pin ADCINB2
 	AdcbRegs.ADCSOC2CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcbRegs.ADCSOC2CTL.bit.TRIGSEL = 1;
+	AdcbRegs.ADCSOC2CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB3
 	AdcbRegs.ADCSOC3CTL.bit.CHSEL = 0x03;  //SOC3 will convert pin ADCINB3
 	AdcbRegs.ADCSOC3CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcbRegs.ADCSOC3CTL.bit.TRIGSEL = 1;
+	AdcbRegs.ADCSOC3CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB4
 	AdcbRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC4 will convert pin ADCINB4
 	AdcbRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcbRegs.ADCSOC4CTL.bit.TRIGSEL = 1;
+	AdcbRegs.ADCSOC4CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB5
 	AdcbRegs.ADCSOC5CTL.bit.CHSEL = 0x05;  //SOC5 will convert pin ADCINB5
 	AdcbRegs.ADCSOC5CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcbRegs.ADCSOC5CTL.bit.TRIGSEL = 1;
+	AdcbRegs.ADCSOC5CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 }
 
@@ -594,159 +578,13 @@ void convertADCBank(uint16_t id) {
 	}
 }
 
-uint16_t sampleADC(uint16_t id) {
-	uint16_t temp;
-
-	switch (id) {
-	case ADCINID_A0:
-		temp = AdcaResultRegs.ADCRESULT0;
-		break;
-	case ADCINID_A1:
-		temp = AdcaResultRegs.ADCRESULT1;
-		break;
-	case ADCINID_A2:
-		temp = AdcaResultRegs.ADCRESULT2;
-		break;
-	case ADCINID_A3:
-		temp = AdcaResultRegs.ADCRESULT3;
-		break;
-	case ADCINID_A4:
-		temp = AdcaResultRegs.ADCRESULT4;
-		break;
-	case ADCINID_A5:
-		temp = AdcaResultRegs.ADCRESULT5;
-		break;
-	case ADCINID_14:
-		temp = AdcaResultRegs.ADCRESULT6;
-		break;
-	case ADCINID_15:
-		temp = AdcaResultRegs.ADCRESULT7;
-		break;
-
-	case ADCINID_B0:
-		temp = AdcbResultRegs.ADCRESULT0;
-		break;
-	case ADCINID_B1:
-		temp = AdcbResultRegs.ADCRESULT1;
-		break;
-	case ADCINID_B2:
-		temp = AdcbResultRegs.ADCRESULT2;
-		break;
-	case ADCINID_B3:
-		temp = AdcbResultRegs.ADCRESULT3;
-		break;
-	case ADCINID_B4:
-		temp = AdcbResultRegs.ADCRESULT4;
-		break;
-	case ADCINID_B5:
-		temp = AdcbResultRegs.ADCRESULT5;
-		break;
-	default:
-		break;
-	}
-
-	return (temp);
-}
-
-
-
 //
-// epwm2_isr - EPWM2 ISR
-//
-__interrupt void epwm2_isr(void) {
-    EPwm2TimerIntCount++;
-
-    EPwm2Regs.ETCLR.bit.INT = 1;
-
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-}
-
-//
-// epwm2_isr - EPWM2 ISR
+// epwm7_isr - EPWM2 ISR
 //
 __interrupt void epwm7_isr(void) {
     EPwm7Regs.ETCLR.bit.INT = 1;
 
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP7;
-}
-
-
-
-
-//
-// InitEPwm2Example - Initialize EPWM2 configuration
-//
-void InitEPwm2Example()
-{
-	int HSPCLKDIV;
-	int CLKDIV;
-    //
-    // Setup TBCLK
-    //
-    EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-    EPwm2Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
-    EPwm2Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
-    EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV4;          // Slow just to observe on
-                                                   // the scope
-    switch (EPwm2Regs.TBCTL.bit.HSPCLKDIV) {
-	case TB_DIV1:
-		HSPCLKDIV = 1;
-		break;
-	case TB_DIV2:
-		HSPCLKDIV = 2;
-		break;
-	case TB_DIV4:
-		HSPCLKDIV = 4;
-		break;
-    }
-    switch (EPwm2Regs.TBCTL.bit.CLKDIV) {
-    	case TB_DIV1:
-    		CLKDIV = 1;
-    		break;
-    	case TB_DIV2:
-    		CLKDIV = 2;
-    		break;
-    	case TB_DIV4:
-    		CLKDIV = 4;
-    		break;
-        }
-    TPWM = 1 / (FPWM);
-	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
-	TBPRD = TPWM / (2.0 * TBCLK);
-	EPwm2Regs.TBPRD = TBPRD; // Set timer period
-	EPwm2Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
-	EPwm2Regs.TBCTR = 0x0000;                     // Clear counter
-
-
-    //
-    // Setup compare
-    //
-    EPwm2Regs.CMPA.bit.CMPA = 0.5 * EPwm2Regs.TBPRD;
-
-    //
-    // Set actions
-    //
-    EPwm2Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
-    EPwm2Regs.AQCTLA.bit.CAD = AQ_CLEAR;
-
-    EPwm2Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
-    EPwm2Regs.AQCTLB.bit.CAD = AQ_SET;
-
-    //
-    // Active Low complementary PWMs - setup the deadband
-    //
-    EPwm2Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm2Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
-    EPwm2Regs.DBCTL.bit.IN_MODE = DBA_ALL;
-    EPwm2Regs.DBRED.bit.DBRED = EPWM2_MIN_DB;
-    EPwm2Regs.DBFED.bit.DBFED = EPWM2_MIN_DB;
-
-    //
-    // Interrupt where we will modify the deadband
-    //
-    EPwm2Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
-    EPwm2Regs.ETSEL.bit.INTEN = 1;                // Enable INT
-    EPwm2Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
 }
 
 //
@@ -756,14 +594,33 @@ void InitEPwm7Example()
 {
 	int HSPCLKDIV;
 	int CLKDIV;
+	double TPWM;
+	double TBCLK;
+	double TBPRD;
+	double EPWM7_MIN_DB;
+
     //
     // Setup TBCLK
     //
     EPwm7Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
     EPwm7Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
-    EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;       // Clock ratio to SYSCLKOUT
-    EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV4;          // Slow just to observe on
-                                                   // the scope
+
+	if (EPWM7_Freq < 200.0) {
+		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
+		EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV4;
+	} else if (EPWM7_Freq < 400.0) {
+		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
+		EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV2;
+	} else if (EPWM7_Freq < 800.0) {
+		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
+		EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV1;
+	} else if (EPWM7_Freq < 1550.0) {
+		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV2;
+		EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV1;
+	} else {
+		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;
+		EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV1;
+	}
     switch (EPwm7Regs.TBCTL.bit.HSPCLKDIV) {
 	case TB_DIV1:
 		HSPCLKDIV = 1;
@@ -786,7 +643,7 @@ void InitEPwm7Example()
     		CLKDIV = 4;
     		break;
         }
-    TPWM = 1 / (FPWM);
+    TPWM = 1 / (EPWM7_Freq);
 	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
 	TBPRD = TPWM / (2.0 * TBCLK);
 	EPwm7Regs.TBPRD = TBPRD; // Set timer period
@@ -794,10 +651,20 @@ void InitEPwm7Example()
 	EPwm7Regs.TBCTR = 0x0000;                     // Clear counter
 
 
+
     //
-    // Setup compare
+    // Set EMP7A,EPWM7B Low on Over-voltage/Over-current condition
     //
-    EPwm7Regs.CMPA.bit.CMPA = 0.5 * EPwm7Regs.TBPRD;
+	EALLOW;
+    EPwm7Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
+    EPwm7Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
+    EPwm7Regs.TZCLR.bit.OST = 1;
+    EDIS;
+
+    //
+    // Set Duty Cycle
+    //
+    EPwm7Regs.CMPA.bit.CMPA = (1.0 - EPWM7_Duty) * EPwm7Regs.TBPRD;
 
     //
     // Set actions
@@ -808,9 +675,12 @@ void InitEPwm7Example()
     EPwm7Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
     EPwm7Regs.AQCTLB.bit.CAD = AQ_SET;
 
+
     //
-    // Active Low complementary PWMs - setup the deadband
+    // Active High complementary PWMs - setup the deadband
     //
+    EPWM7_MIN_DB = DB_TIME / TBCLK;
+
     EPwm7Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
     EPwm7Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
     EPwm7Regs.DBCTL.bit.IN_MODE = DBA_ALL;
@@ -823,6 +693,114 @@ void InitEPwm7Example()
     EPwm7Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
     EPwm7Regs.ETSEL.bit.INTEN = 1;                // Enable INT
     EPwm7Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
+}
+
+
+//
+// InitEPwm8Example - Initialize EPWM8 configuration
+//
+void InitEPwm8Example()
+{
+	int HSPCLKDIV;
+	int CLKDIV;
+	double TPWM;
+	double TBCLK;
+	double TBPRD;
+	double EPWM8_MIN_DB;
+
+    //
+    // Setup TBCLK
+    //
+    EPwm8Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
+    EPwm8Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
+
+	if (EPWM8_Freq < 200.0) {
+		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
+		EPwm8Regs.TBCTL.bit.CLKDIV = TB_DIV4;
+	} else if (EPWM8_Freq < 400.0) {
+		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
+		EPwm8Regs.TBCTL.bit.CLKDIV = TB_DIV2;
+	} else if (EPWM8_Freq < 800.0) {
+		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
+		EPwm8Regs.TBCTL.bit.CLKDIV = TB_DIV1;
+	} else if (EPWM8_Freq < 1550.0) {
+		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV2;
+		EPwm8Regs.TBCTL.bit.CLKDIV = TB_DIV1;
+	} else {
+		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;
+		EPwm8Regs.TBCTL.bit.CLKDIV = TB_DIV1;
+	}
+    switch (EPwm8Regs.TBCTL.bit.HSPCLKDIV) {
+	case TB_DIV1:
+		HSPCLKDIV = 1;
+		break;
+	case TB_DIV2:
+		HSPCLKDIV = 2;
+		break;
+	case TB_DIV4:
+		HSPCLKDIV = 4;
+		break;
+    }
+    switch (EPwm8Regs.TBCTL.bit.CLKDIV) {
+    	case TB_DIV1:
+    		CLKDIV = 1;
+    		break;
+    	case TB_DIV2:
+    		CLKDIV = 2;
+    		break;
+    	case TB_DIV4:
+    		CLKDIV = 4;
+    		break;
+        }
+    TPWM = 1 / (EPWM8_Freq);
+	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
+	TBPRD = TPWM / (2.0 * TBCLK);
+	EPwm8Regs.TBPRD = TBPRD; // Set timer period
+	EPwm8Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
+	EPwm8Regs.TBCTR = 0x0000;                     // Clear counter
+
+
+    //
+    // Set EMP8A, EPWM8B Low on Over-voltage/Over-current condition
+    //
+	EALLOW;
+    EPwm8Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
+    EPwm8Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
+    EPwm8Regs.TZCLR.bit.OST = 1;
+    EDIS;
+
+    //
+    // Set Duty Cycle
+    //
+    EPwm8Regs.CMPA.bit.CMPA = (1.0 - EPWM8_Duty) * EPwm8Regs.TBPRD;
+
+    //
+    // Set actions
+    //
+    EPwm8Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
+    EPwm8Regs.AQCTLA.bit.CAD = AQ_CLEAR;
+
+    EPwm8Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
+    EPwm8Regs.AQCTLB.bit.CAD = AQ_SET;
+
+
+    //
+    // Active High complementary PWMs - setup the deadband
+    //
+    EPWM8_MIN_DB = DB_TIME / TBCLK;
+
+    EPwm8Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+    EPwm8Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
+    EPwm8Regs.DBCTL.bit.IN_MODE = DBA_ALL;
+    EPwm8Regs.DBRED.bit.DBRED = EPWM8_MIN_DB;
+    EPwm8Regs.DBFED.bit.DBFED = EPWM8_MIN_DB;
+
+    //
+    // Interrupt where we will modify the deadband
+    //
+    EPwm8Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
+    EPwm8Regs.ETSEL.bit.INTEN = 1;                // Enable INT
+    EPwm8Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
 }
 
 
@@ -867,42 +845,45 @@ void storeADCValues() {
 
 	// Actual Values
 	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
-	VDC1_Real = 2.0*VDC1_ADC-426.0;
+	VDC1_Real = 2.0 * VDC1_ADC - 426.0;
 	VDC2_Real = VDC2_ADC - 218.0;
 }
 
 void printAndyBoard(void) {
 	printf("Raw Values\n\r");
-	printf("ADCINA0 Sample = %u\n\r", sampleADC(ADCINID_A0));
-	printf("ADCINA1 Sample = %u\n\r", sampleADC(ADCINID_A1));
-	printf("ADCINA2 Sample = %u\n\r", sampleADC(ADCINID_A2));
-	printf("ADCINA3 Sample = %u\n\r", sampleADC(ADCINID_A3));
-	printf("ADCINA4 Sample = %u\n\r", sampleADC(ADCINID_A4));
-	printf("ADCINA5 Sample = %u\n\r", sampleADC(ADCINID_A5));
-	printf("ADCIN14 Sample = %u\n\r", sampleADC(ADCINID_14));
-	printf("ADCIN15 Sample = %u\n\r", sampleADC(ADCINID_15));
-
-	printf("ADCINB0 Sample = %u\n\r", sampleADC(ADCINID_B0));
-	printf("ADCINB1 Sample = %u\n\r", sampleADC(ADCINID_B1));
-	printf("ADCINB2 Sample = %u\n\r", sampleADC(ADCINID_B2));
-	printf("ADCINB3 Sample = %u\n\r", sampleADC(ADCINID_B3));
-	printf("ADCINB4 Sample = %u\n\r", sampleADC(ADCINID_B4));
-	printf("ADCINB5 Sample = %u\n\r", sampleADC(ADCINID_B5));
+	printf("ADCINA0 Sample = %u\n\r", AdcaResultRegs.ADCRESULT0);
 
 	printf("Real Values\n\r");
 	printf("V2AB_Real = %.2f\n\r", V2AB_Real);
 }
 
-void haltOverVoltage(void) {
-	if (V2AB_Real_Avg > VOLTAGE_LIMIT || V2AB_Real_Avg < (-1.0*VOLTAGE_LIMIT)) {
-		while (1) {
-			toggleBlueLED();
-			DELAY_US(1000*1000);
-			toggleRedLED();
-			DELAY_US(1000*1000);
-		}
-	}
+char checkV2AB() {
+	return 0;
+}
 
+char checkVDC1() {
+	if (VDC1_Real_Avg > VDC1_LIMIT)
+		return 1;
+	return 0;
+}
+
+char checkVDC2() {
+	return 0;
+}
+
+void haltOverVoltage(void) {
+	char flag = 0;
+	flag |= checkVDC1();
+	flag |= checkVDC2();
+	flag |= checkV2AB();
+
+	if (flag) {
+		EALLOW;
+		EPwm7Regs.TZFRC.bit.OST = 1;
+		EPwm8Regs.TZFRC.bit.OST = 1;
+		EDIS;
+		while (1) {}
+	}
 }
 
 void hysteresisControl() {
@@ -926,65 +907,24 @@ void toggleRedLED() {
 	GPIO_WritePin(LED_GPIO_RED, redLED_state);
 }
 
-void togglePWM1() {
-	if (PWM1_count >= PWM1_multiple) {
-		PWM1_count = 1;
-		PWM1_state = !PWM1_state;
-		GPIO_WritePin(PWM1_GPIO, PWM1_state);
-	}
-	else
-		PWM1_count++;
+void toggleGPIOPWM1() {
+	PWM1_state = !PWM1_state;
+	GPIO_WritePin(PWM1_GPIO, PWM1_state);
 }
 
-void togglePWM2() {
-	if (PWM2_count >= PWM2_multiple) {
-		PWM2_count = 1;
-		PWM2_state = !PWM2_state;
-		GPIO_WritePin(PWM2_GPIO, PWM2_state);
-	} else
-		PWM2_count++;
+void toggleGPIOPWM2() {
+	PWM2_state = !PWM2_state;
+	GPIO_WritePin(PWM2_GPIO, PWM2_state);
 }
 
-void togglePWM3() {
-	if (PWM3_count >= PWM3_multiple) {
-		PWM3_count = 1;
-		PWM3_state = !PWM3_state;
-		GPIO_WritePin(PWM3_GPIO, PWM3_state);
-	} else
-		PWM3_count++;
+void toggleGPIOPWM3() {
+	PWM3_state = !PWM3_state;
+	GPIO_WritePin(PWM3_GPIO, PWM3_state);
 }
 
-void togglePWM4() {
-	if (PWM4_count >= PWM4_multiple) {
-		PWM4_count = 1;
-		PWM4_state = !PWM4_state;
-		GPIO_WritePin(PWM4_GPIO, PWM4_state);
-	} else
-		PWM4_count++;
-}
-
-void setGPIOPWM1Freq(double freq) {
-	// freq in Hz
-	PWM1_multiple = ((1/(2*freq))*(1000000))/CPU_TIMER1_PERIOD;
-	PWM1_count = 1;
-}
-
-void setGPIOPWM2Freq(double freq) {
-	// freq in Hz
-	PWM2_multiple = ((1/(2*freq))*(1000000))/CPU_TIMER1_PERIOD;
-	PWM2_count = 1;
-}
-
-void setGPIOPWM3Freq(double freq) {
-	// freq in Hz
-	PWM3_multiple = ((1/(2*freq))*(1000000))/CPU_TIMER1_PERIOD;
-	PWM3_count = 1;
-}
-
-void setGPIOPWM4Freq(double freq) {
-	// freq in Hz
-	PWM4_multiple = ((1/(2*freq))*(1000000))/CPU_TIMER1_PERIOD;
-	PWM4_count = 1;
+void toggleGPIOPWM4() {
+	PWM4_state = !PWM4_state;
+	GPIO_WritePin(PWM4_GPIO, PWM4_state);
 }
 
 __interrupt void cpu_timer0_isr(void) {
@@ -993,13 +933,13 @@ __interrupt void cpu_timer0_isr(void) {
 
 
 	storeADCValues(); // Store and Convert ADC Values in variables in memory
-	//movingAvgADC();
+	movingAvgADC();
 //	toggleGPIOPWM1();
 //	toggleGPIOPWM2();
 //	toggleGPIOPWM3();
 //	toggleGPIOPWM4();
 
-	// haltOverVoltage();
+	haltOverVoltage();
 
 	// hysteresisControl();
 
