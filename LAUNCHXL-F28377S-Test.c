@@ -158,15 +158,17 @@ float VDC1_Real_Buf[MOV_AVG_SIZE];
 float VDC1_Real_BufSum = 0;
 float VDC1_Real_Avg = 0;
 
+float VDC12_Real_Avg = 0;
+
 float IL2_Real = 0;
 float ANALOG_Real = 0;
 float IL1_Real = 0;
 
 // EPWM
-double EPWM7_Freq = 60.0 * 2.0;
-double EPWM7_Duty = 0.8;
+double EPWM7_Freq = 10000.0 * 2.0;
+double EPWM7_Duty = 0.5;
 
-double EPWM8_Freq = 120.0 * 2.0;
+double EPWM8_Freq = 10000.0 * 2.0;
 double EPWM8_Duty = 0.5;
 
 
@@ -203,6 +205,7 @@ void storeADCValues(void);
 void movingAvgADC(void);
 
 void haltOverVoltage(void);
+void disableEPWM(void);
 char checkVDC1(void);
 char checkVDC2(void);
 char checkV2AB(void);
@@ -214,6 +217,7 @@ void InitEPwm7Example(void);
 void InitEPwm8Example(void);
 __interrupt void epwm7_isr(void);
 __interrupt void epwm8_isr(void);
+void enablePWMBuffer(void);
 
 // CPU Timers
 __interrupt void cpu_timer0_isr(void);
@@ -294,7 +298,7 @@ void main(void) {
 	EDIS;
 
 	InitEPwm7Example();
-	InitEPwm8Example();
+	//InitEPwm8Example();
 
 	EALLOW;
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -350,6 +354,8 @@ void main(void) {
 	ERTM;// Enable Global realtime interrupt DBGM
 
 // take conversions indefinitely in loop
+	// disableEPWM();
+
 	do {
 
 //		toggleBlueLED();
@@ -514,14 +520,14 @@ void init_ADC() {
 	AdcaRegs.ADCSOC5CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCIN14
-	AdcaRegs.ADCSOC14CTL.bit.CHSEL = 0x06;  //SOC6 will convert pin ADCIN14
-	AdcaRegs.ADCSOC14CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC14CTL.bit.TRIGSEL = 1; // Trigger on Timer0
+	AdcaRegs.ADCSOC6CTL.bit.CHSEL = 0x0E;  //SOC6 will convert pin ADCIN14
+	AdcaRegs.ADCSOC6CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC6CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCIN15
-	AdcaRegs.ADCSOC15CTL.bit.CHSEL = 0x07;  //SOC7 will convert pin ADCIN15
-	AdcaRegs.ADCSOC15CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
-	AdcaRegs.ADCSOC15CTL.bit.TRIGSEL = 1; // Trigger on Timer0
+	AdcaRegs.ADCSOC7CTL.bit.CHSEL = 0x0F;  //SOC7 will convert pin ADCIN15
+	AdcaRegs.ADCSOC7CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC7CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//
 	//ADCINB
@@ -664,13 +670,13 @@ void InitEPwm7Example()
     //
     // Set Duty Cycle
     //
-    EPwm7Regs.CMPA.bit.CMPA = (1.0 - EPWM7_Duty) * EPwm7Regs.TBPRD;
+    EPwm7Regs.CMPA.bit.CMPA = EPWM7_Duty * EPwm7Regs.TBPRD;
 
     //
     // Set actions
     //
-    EPwm7Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
-    EPwm7Regs.AQCTLA.bit.CAD = AQ_CLEAR;
+//    EPwm7Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
+//    EPwm7Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 
     EPwm7Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
     EPwm7Regs.AQCTLB.bit.CAD = AQ_SET;
@@ -681,18 +687,19 @@ void InitEPwm7Example()
     //
     EPWM7_MIN_DB = DB_TIME / TBCLK;
 
-    EPwm7Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm7Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
-    EPwm7Regs.DBCTL.bit.IN_MODE = DBA_ALL;
-    EPwm7Regs.DBRED.bit.DBRED = EPWM7_MIN_DB;
-    EPwm7Regs.DBFED.bit.DBFED = EPWM7_MIN_DB;
-
-    //
-    // Interrupt where we will modify the deadband
-    //
-    EPwm7Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
-    EPwm7Regs.ETSEL.bit.INTEN = 1;                // Enable INT
-    EPwm7Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
+//    EPwm7Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+//    EPwm7Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
+//    EPwm7Regs.DBCTL.bit.IN_MODE = DBA_ALL;
+//    EPwm7Regs.DBRED.bit.DBRED = EPWM7_MIN_DB;
+//    EPwm7Regs.DBFED.bit.DBFED = EPWM7_MIN_DB;
+//
+//    //
+//    // Interrupt where we will modify the deadband
+//    //
+//    EPwm7Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
+//    EPwm7Regs.ETSEL.bit.INTEN = 1;                // Enable INT
+//    EPwm7Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
+    enablePWMBuffer();
 }
 
 
@@ -845,8 +852,9 @@ void storeADCValues() {
 
 	// Actual Values
 	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
-	VDC1_Real = 2.0 * VDC1_ADC - 426.0;
-	VDC2_Real = VDC2_ADC - 218.0;
+	VDC1_Real = 2.0*VDC1_ADC - 412.0;
+	//VDC2_Real = VDC2_ADC;
+	VDC2_Real = 2.05*VDC2_ADC - 418.35;
 }
 
 void printAndyBoard(void) {
@@ -871,6 +879,13 @@ char checkVDC2() {
 	return 0;
 }
 
+void disableEPWM(void) {
+	EALLOW;
+	EPwm7Regs.TZFRC.bit.OST = 1;
+	EPwm8Regs.TZFRC.bit.OST = 1;
+	EDIS;
+}
+
 void haltOverVoltage(void) {
 	char flag = 0;
 	flag |= checkVDC1();
@@ -878,10 +893,7 @@ void haltOverVoltage(void) {
 	flag |= checkV2AB();
 
 	if (flag) {
-		EALLOW;
-		EPwm7Regs.TZFRC.bit.OST = 1;
-		EPwm8Regs.TZFRC.bit.OST = 1;
-		EDIS;
+		disableEPWM();
 		while (1) {}
 	}
 }
@@ -939,7 +951,7 @@ __interrupt void cpu_timer0_isr(void) {
 //	toggleGPIOPWM3();
 //	toggleGPIOPWM4();
 
-	haltOverVoltage();
+	// haltOverVoltage();
 
 	// hysteresisControl();
 
@@ -979,11 +991,24 @@ void movingAvgADC() {
 
 	// VDC2
 	VDC2_Real_BufSum -= VDC2_Real_Buf[buf_idx];
-	VDC2_Real_Buf[buf_idx] = VDC1_Real;
+	VDC2_Real_Buf[buf_idx] = VDC2_Real;
 	VDC2_Real_BufSum += VDC2_Real_Buf[buf_idx];
 	VDC2_Real_Avg = VDC2_Real_BufSum / MOV_AVG_SIZE;
 
+	VDC12_Real_Avg = VDC1_Real_Avg - VDC2_Real_Avg;
+
 	buf_idx++;
+}
+
+void enablePWMBuffer() {
+	GPIO_SetupPinMux(69, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(69, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(69, 1);
+
+	GPIO_SetupPinMux(66, GPIO_MUX_CPU1, 0);
+	GPIO_SetupPinOptions(66, GPIO_OUTPUT, GPIO_PUSHPULL);
+	GPIO_WritePin(66, 0);
+
 }
 
 //
