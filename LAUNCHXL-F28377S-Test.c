@@ -41,7 +41,7 @@
 //
 
 // Timers
-#define CPU_TIMER0_PERIOD 1 // us
+#define CPU_TIMER0_PERIOD 10 // us
 #define CPU_TIMER1_PERIOD 1 // us
 #define CPU_TIMER2_PERIOD 1 // us
 
@@ -57,10 +57,18 @@
 // Over-voltage / Over-current Limit
 #define VDC1_LIMIT 9.0
 #define VDC2_LIMIT 9.0
+#define VDC12_LIMIT 20.0
+
 #define V2AB_LIMIT 9.0
 
 // Analog to Digital (ADC)
-#define MOV_AVG_SIZE 512
+#define MOV_AVG_SIZE_HI 1024
+#define MOV_AVG_SIZE 256
+
+#define ACQPS_TIME 88
+#define EPWM7_DUTY_UPPER 0.5
+#define EPWM7_DUTY_LOWER 0.1
+#define EPWM7_INC 0.02
 
 enum ADCINID {
 	ADCINID_A0 = 0x00,
@@ -135,6 +143,7 @@ uint16_t IL1_ADC = 0;
 
 // Actual Values
 uint16_t buf_idx = 0;
+uint16_t buf_idx_hi = 0;
 float VC4_Real = 0;
 
 float V2AB_Real = 0;
@@ -162,7 +171,11 @@ float VDC12_Real_Avg = 0;
 
 float IL2_Real = 0;
 float ANALOG_Real = 0;
+
 float IL1_Real = 0;
+float IL1_Real_Buf[MOV_AVG_SIZE_HI];
+float IL1_Real_BufSum = 0;
+float IL1_Real_Avg = 0;
 
 // EPWM
 double EPWM7_Freq = 10000.0 * 2.0;
@@ -170,6 +183,10 @@ double EPWM7_Duty = 0.5;
 
 double EPWM8_Freq = 10000.0 * 2.0;
 double EPWM8_Duty = 0.5;
+
+char EPWM7_Up = 1;
+
+
 
 
 //
@@ -208,6 +225,7 @@ void haltOverVoltage(void);
 void disableEPWM(void);
 char checkVDC1(void);
 char checkVDC2(void);
+char checkVDC12(void);
 char checkV2AB(void);
 
 void hysteresisControl(void);
@@ -357,19 +375,17 @@ void main(void) {
 	// disableEPWM();
 
 	do {
-
-//		toggleBlueLED();
 //		if (EPWM7_Up) {
-//			EPWM7_Duty += 0.01;
-//			if (EPWM7_Duty >= 0.9)
+//			EPWM7_Duty += EPWM7_INC;
+//			if (EPWM7_Duty >= EPWM7_DUTY_UPPER)
 //				EPWM7_Up = 0;
 //		} else {
-//			EPWM7_Duty -= 0.01;
-//			if (EPWM7_Duty <= 0.05)
+//			EPWM7_Duty -= EPWM7_INC;
+//			if (EPWM7_Duty <= EPWM7_DUTY_LOWER)
 //				EPWM7_Up = 1;
 //		}
 //		EPwm7Regs.CMPA.bit.CMPA = EPWM7_Duty * EPwm7Regs.TBPRD;
-//		DELAY_US(1000*10);
+//		DELAY_US(500);
 	} while (1);
 }
 
@@ -450,10 +466,13 @@ void init_printf() {
 void init_ADC() {
 	// Initialize Moving Average Arrays
 	int idx;
-	for (idx = 0; idx < MOV_AVG_SIZE; idx++) {
-		V2AB_Real_Buf[idx] = 0;
-		VDC1_Real_Buf[idx] = 0;
-		VDC2_Real_Buf[idx] = 0;
+	for (idx = 0; idx < MOV_AVG_SIZE_HI; idx++) {
+		if (idx < MOV_AVG_SIZE) {
+			V2AB_Real_Buf[idx] = 0;
+			VDC1_Real_Buf[idx] = 0;
+			VDC2_Real_Buf[idx] = 0;
+		}
+		IL1_Real_Buf[idx] = 0;
 	}
 
 	// ADC1 configuation
@@ -491,42 +510,42 @@ void init_ADC() {
 
 	//ADCINA0
 	AdcaRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINA0
-	AdcaRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC0CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC0CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA1
 	AdcaRegs.ADCSOC1CTL.bit.CHSEL = 0x01;  //SOC1 will convert pin ADCINA1
-	AdcaRegs.ADCSOC1CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC1CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC1CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA2
 	AdcaRegs.ADCSOC2CTL.bit.CHSEL = 0x02;  //SOC2 will convert pin ADCINA2
-	AdcaRegs.ADCSOC2CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC2CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC2CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA3
 	AdcaRegs.ADCSOC3CTL.bit.CHSEL = 0x03;  //SOC3 will convert pin ADCINA3
-	AdcaRegs.ADCSOC3CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC3CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC3CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA4
 	AdcaRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC4 will convert pin ADCINA4
-	AdcaRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC4CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC4CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINA5
 	AdcaRegs.ADCSOC5CTL.bit.CHSEL = 0x05;  //SOC5 will convert pin ADCINA5
-	AdcaRegs.ADCSOC5CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC5CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC5CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCIN14
 	AdcaRegs.ADCSOC6CTL.bit.CHSEL = 0x0E;  //SOC6 will convert pin ADCIN14
-	AdcaRegs.ADCSOC6CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC6CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC6CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCIN15
 	AdcaRegs.ADCSOC7CTL.bit.CHSEL = 0x0F;  //SOC7 will convert pin ADCIN15
-	AdcaRegs.ADCSOC7CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcaRegs.ADCSOC7CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcaRegs.ADCSOC7CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//
@@ -538,32 +557,32 @@ void init_ADC() {
 
 	//ADCINB0
 	AdcbRegs.ADCSOC0CTL.bit.CHSEL = 0x00;  //SOC0 will convert pin ADCINB0
-	AdcbRegs.ADCSOC0CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC0CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcbRegs.ADCSOC0CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB1
 	AdcbRegs.ADCSOC1CTL.bit.CHSEL = 0x01;  //SOC1 will convert pin ADCINB1
-	AdcbRegs.ADCSOC1CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC1CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcbRegs.ADCSOC1CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB2
 	AdcbRegs.ADCSOC2CTL.bit.CHSEL = 0x02;  //SOC2 will convert pin ADCINB2
-	AdcbRegs.ADCSOC2CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC2CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcbRegs.ADCSOC2CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB3
 	AdcbRegs.ADCSOC3CTL.bit.CHSEL = 0x03;  //SOC3 will convert pin ADCINB3
-	AdcbRegs.ADCSOC3CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC3CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcbRegs.ADCSOC3CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB4
 	AdcbRegs.ADCSOC4CTL.bit.CHSEL = 0x04;  //SOC4 will convert pin ADCINB4
-	AdcbRegs.ADCSOC4CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC4CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcbRegs.ADCSOC4CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 	//ADCINB5
 	AdcbRegs.ADCSOC5CTL.bit.CHSEL = 0x05;  //SOC5 will convert pin ADCINB5
-	AdcbRegs.ADCSOC5CTL.bit.ACQPS = 25; //sample window is acqps + 1 SYSCLK cycles
+	AdcbRegs.ADCSOC5CTL.bit.ACQPS = ACQPS_TIME; //sample window is acqps + 1 SYSCLK cycles
 	AdcbRegs.ADCSOC5CTL.bit.TRIGSEL = 1; // Trigger on Timer0
 
 }
@@ -852,9 +871,16 @@ void storeADCValues() {
 
 	// Actual Values
 	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
-	VDC1_Real = 2.0*VDC1_ADC - 412.0;
+
+	// VDC1_Real = VDC1_ADC;
+	VDC1_Real = -450.709 + 2.19091*VDC1_ADC;
+
 	//VDC2_Real = VDC2_ADC;
-	VDC2_Real = 2.05*VDC2_ADC - 418.35;
+	VDC2_Real = -468.707 + 2.307*VDC2_ADC;
+
+	// IL1_Real = IL1_ADC;
+	//IL1_Real = 1206.8 - 0.4*IL1_ADC;
+	IL1_Real = 1676.67 - 0.555556*IL1_ADC;
 }
 
 void printAndyBoard(void) {
@@ -879,18 +905,27 @@ char checkVDC2() {
 	return 0;
 }
 
+char checkVDC12() {
+	if (VDC12_Real_Avg > VDC12_LIMIT)
+		return 1;
+	return 0;
+}
+
 void disableEPWM(void) {
-	EALLOW;
-	EPwm7Regs.TZFRC.bit.OST = 1;
-	EPwm8Regs.TZFRC.bit.OST = 1;
-	EDIS;
+//	EALLOW;
+//	EPwm7Regs.TZFRC.bit.OST = 1;
+//	EPwm8Regs.TZFRC.bit.OST = 1;
+//	EDIS;
+	GPIO_WritePin(69, 0);
 }
 
 void haltOverVoltage(void) {
 	char flag = 0;
-	flag |= checkVDC1();
-	flag |= checkVDC2();
-	flag |= checkV2AB();
+//	flag |= checkVDC1();
+//	flag |= checkVDC2();
+//	flag |= checkV2AB();
+
+	flag |= checkVDC12();
 
 	if (flag) {
 		disableEPWM();
@@ -976,6 +1011,8 @@ __interrupt void cpu_timer2_isr(void) {
 void movingAvgADC() {
 	if (buf_idx >= MOV_AVG_SIZE)
 		buf_idx = 0;
+	if (buf_idx_hi >= MOV_AVG_SIZE_HI)
+			buf_idx_hi = 0;
 
 	// V2AB
 	V2AB_Real_BufSum -= V2AB_Real_Buf[buf_idx];
@@ -995,9 +1032,18 @@ void movingAvgADC() {
 	VDC2_Real_BufSum += VDC2_Real_Buf[buf_idx];
 	VDC2_Real_Avg = VDC2_Real_BufSum / MOV_AVG_SIZE;
 
+	// IL1
+	IL1_Real_BufSum -= IL1_Real_Buf[buf_idx_hi];
+	IL1_Real_Buf[buf_idx_hi] = IL1_Real;
+	IL1_Real_BufSum += IL1_Real_Buf[buf_idx_hi];
+	IL1_Real_Avg = IL1_Real_BufSum / MOV_AVG_SIZE_HI;
+
 	VDC12_Real_Avg = VDC1_Real_Avg - VDC2_Real_Avg;
 
 	buf_idx++;
+	buf_idx_hi++;
+
+	// printf("%f\n\r",IL1_Real_Avg);
 }
 
 void enablePWMBuffer() {
