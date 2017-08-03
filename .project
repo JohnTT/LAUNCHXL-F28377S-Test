@@ -96,9 +96,24 @@
 			<locationURI>INSTALLROOT_F2837x_VERSION/F2837xS_common/source/F2837xS_usDelay.asm</locationURI>
 		</link>
 		<link>
+			<name>SINTB360.ASM</name>
+			<type>1</type>
+			<locationURI>SGEN_LIB_LOC/v101/source/C28x_SGEN_LIB/SINTB360.ASM</locationURI>
+		</link>
+		<link>
 			<name>profilec.asm</name>
 			<type>1</type>
 			<locationURI>SGEN_LIB_LOC/v101/source/C28x_SGEN_LIB/profilec.asm</locationURI>
+		</link>
+		<link>
+			<name>rampgc.asm</name>
+			<type>1</type>
+			<locationURI>SGEN_LIB_LOC/v101/source/C28x_SGEN_LIB/rampgc.asm</locationURI>
+		</link>
+		<link>
+			<name>sgti1c.asm</name>
+			<type>1</type>
+			<locationURI>SGEN_LIB_LOC/v101/source/C28x_SGEN_LIB/sgti1c.asm</locationURI>
 		</link>
 	</linkedResources>
 	<variableList>

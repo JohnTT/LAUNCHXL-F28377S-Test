@@ -35,7 +35,6 @@
 #include "sci_io.h"
 #include "sgen.h"
 
-
 //
 // Defines
 //
@@ -59,11 +58,16 @@
 #define VDC2_LIMIT 9.0
 #define VDC12_LIMIT 20.0
 
+#define IL1_LIMIT 3.0
+
+#define EPWM7B_MIN_DUTY 0.2
+#define EPWM7B_MAX_DUTY 0.7
+
 #define V2AB_LIMIT 9.0
 
 // Analog to Digital (ADC)
-#define MOV_AVG_SIZE_HI 1024
-#define MOV_AVG_SIZE 256
+#define MOV_AVG_SIZE_HI 256
+#define MOV_AVG_SIZE 128
 
 #define ACQPS_TIME 88
 #define EPWM7_DUTY_UPPER 0.5
@@ -88,11 +92,25 @@ enum ADCINID {
 	ADCINID_B5 = 0x15
 };
 
-
 // EPWM
 #define EPWMCLK 200000000 // 200MHz
-#define DB_TIME 0.000004 // 4uS
+#define DB_TIME 0.000005 // 5uS
 
+#define HYSTERESIS_BAND 0.05
+
+// DAC
+#define DLOG_SIZE             1024
+#define REFERENCE_VDAC        0
+#define REFERENCE_VREF        1
+#define LOW_THD_SINE          0
+#define HIGH_PRECISION_SINE   1
+#define DACA                  1
+#define DACB                  2
+#define DACC                  3
+#define SINEWAVE_TYPE         LOW_THD_SINE
+#define REFERENCE             REFERENCE_VREF
+#define CPUFREQ_MHZ           200
+#define DAC_NUM               DACA
 
 //
 // Globals
@@ -116,7 +134,6 @@ char PWM4_state = 0;
 float CMPHI = 8.0;
 float CMPLO = -8.0;
 char up = 1;
-
 
 //
 // Analog to Digital (ADC)
@@ -146,30 +163,33 @@ uint16_t buf_idx = 0;
 uint16_t buf_idx_hi = 0;
 float VC4_Real = 0;
 
+float V1AB_Real = 0;
+float V1AB_Real_Buf[MOV_AVG_SIZE];
+float V1AB_Real_BufSum = 0;
+float V1AB_Real_Avg = 0;
+
 float V2AB_Real = 0;
 float V2AB_Real_Buf[MOV_AVG_SIZE];
 float V2AB_Real_BufSum = 0;
 float V2AB_Real_Avg = 0;
 
 float VC3_Real = 0;
-float V1AB_Real = 0;
 float IL4_Real = 0;
 float IL3_Real = 0;
 
 // J5 and J7
-float VDC2_Real = 0;
-float VDC2_Real_Buf[MOV_AVG_SIZE];
-float VDC2_Real_BufSum = 0;
-float VDC2_Real_Avg = 0;
-
 float VDC1_Real = 0;
 float VDC1_Real_Buf[MOV_AVG_SIZE];
 float VDC1_Real_BufSum = 0;
 float VDC1_Real_Avg = 0;
 
+float VDC2_Real = 0;
+float VDC2_Real_Buf[MOV_AVG_SIZE];
+float VDC2_Real_BufSum = 0;
+float VDC2_Real_Avg = 0;
+
 float VDC12_Real_Avg = 0;
 
-float IL2_Real = 0;
 float ANALOG_Real = 0;
 
 float IL1_Real = 0;
@@ -177,17 +197,58 @@ float IL1_Real_Buf[MOV_AVG_SIZE_HI];
 float IL1_Real_BufSum = 0;
 float IL1_Real_Avg = 0;
 
+unsigned int IL1_Ref = 0;
+float IL1_Hyst_SetPoint = 2.0;
+
+float IL2_Real = 0;
+float IL2_Real_Buf[MOV_AVG_SIZE_HI];
+float IL2_Real_BufSum = 0;
+float IL2_Real_Avg = 0;
+unsigned int IL2_Ref = 0;
+
 // EPWM
 double EPWM7_Freq = 10000.0 * 2.0;
 double EPWM7_Duty = 0.5;
 
+int PWM7_seekUpperBand = 2;
+
 double EPWM8_Freq = 10000.0 * 2.0;
-double EPWM8_Duty = 0.5;
+double EPWM8_Duty = 0.6;
 
 char EPWM7_Up = 1;
 
+// DAC
+Uint16 DataLog[DLOG_SIZE];
+volatile struct DAC_REGS* DAC_PTR[4] = { 0x0, &DacaRegs, &DacbRegs, &DaccRegs };
+Uint32 samplingFreq_hz = 200000;
+Uint32 outputFreqA_hz = 13;
+Uint32 outputFreqB_hz = 17;
+Uint32 maxOutputFreq_hz = 5000;
+float waveformGainA = 0.5; // Range 0.0 -> 1.0
+float waveformOffsetA = 0.0;    // Range -1.0 -> 1.0
+float waveformGainB = 0.5; // Range 0.0 -> 1.0
+float waveformOffsetB = 0.0;    // Range -1.0 -> 1.0
 
+RMPGEN triwave1 = RMPGEN_DEFAULTS; //initialize ramp wave
+#if SINEWAVE_TYPE==LOW_THD_SINE //initialize sine wave type
+SGENTI_1 sgenIL1a = SGENTI_1_DEFAULTS;
+SGENTI_1 sgenIL1b = SGENTI_1_DEFAULTS;
+#elif SINEWAVE_TYPE==HIGH_PRECISION_SINE
+SGENHP_1 sgenIL1a = SGENHP_1_DEFAULTS;
+SGENHP_1 sgenIL1b = SGENHP_1_DEFAULTS;
+#endif
 
+Uint16 sgenIL1a_out = 0;
+Uint16 sgenIL1b_out = 0;
+Uint16 ndx = 0;
+float freqResolution_hz = 0;
+float cpuPeriod_us = 0;
+Uint32 interruptCycles = 0;
+float interruptDuration_us = 0;
+float samplingPeriod_us = 0;
+Uint16 maxOutput_lsb = 0;
+Uint16 minOutput_lsb = 0;
+Uint16 pk_to_pk_lsb = 0;
 
 //
 // Function Prototypes
@@ -214,7 +275,6 @@ void setGPIOPWM2Freq(double freq);
 void setGPIOPWM3Freq(double freq);
 void setGPIOPWM4Freq(double freq);
 
-
 // Analog to Digital (ADC)
 void init_ADC(void);
 void convertADCBank(uint16_t id);
@@ -237,11 +297,25 @@ __interrupt void epwm7_isr(void);
 __interrupt void epwm8_isr(void);
 void enablePWMBuffer(void);
 
+void PWM7CurrentControl(void);
+
+void PWM7HysteresisControl(void);
+
 // CPU Timers
 __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
 __interrupt void cpu_timer2_isr(void);
 
+// DAC
+static inline void dlog(Uint16 value);
+static inline void setFreq(void);
+static inline void setGain(void);
+static inline void setOffset(void);
+static inline Uint16 getMax(void);
+static inline Uint16 getMin(void);
+void configureDAC(Uint16 dac_num);
+void configureWaveform(void);
+interrupt void cpu_timer0_isr(void);
 
 void main(void) {
 
@@ -302,8 +376,8 @@ void main(void) {
 //	PieVectTable.EPWM8_INT = &epwm8_isr;
 
 	PieVectTable.TIMER0_INT = &cpu_timer0_isr; // Need this for CPU Timer0
-	PieVectTable.TIMER1_INT = &cpu_timer1_isr; // Need this for CPU Timer1
-	PieVectTable.TIMER2_INT = &cpu_timer2_isr; // Need this for CPU Timer2
+//	PieVectTable.TIMER1_INT = &cpu_timer1_isr; // Need this for CPU Timer1
+//	PieVectTable.TIMER2_INT = &cpu_timer2_isr; // Need this for CPU Timer2
 
 	EDIS;
 	// This is needed to disable write to EALLOW protected registers
@@ -322,13 +396,40 @@ void main(void) {
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
 	EDIS;
 
+	// -------------------------
+	//
+	// Initialize variables
+	//
+	cpuPeriod_us = (1.0 / CPUFREQ_MHZ);
+	samplingPeriod_us = (1000000.0 / samplingFreq_hz);
+
+	//
+	// Initialize datalog
+	//
+	for (ndx = 0; ndx < DLOG_SIZE; ndx++) {
+		DataLog[ndx] = 0;
+	}
+	ndx = 0;
+
+	//
+	// Configure DAC
+	//
+	// configureDAC(DAC_NUM);
+
+	//
+	// Configure Waveform
+	//
+	configureWaveform();
+	// --------
+
 	InitCpuTimers();   // For this example, only initialize the Cpu Timers
 
-
 	// Configure CPU-Timer 0,1,2 to __interrupt
-	ConfigCpuTimer(&CpuTimer0, 200, CPU_TIMER0_PERIOD); // lower than 10us too fast, prevents other ISR from running
-	ConfigCpuTimer(&CpuTimer1, 200, CPU_TIMER1_PERIOD);
-	ConfigCpuTimer(&CpuTimer2, 200, CPU_TIMER2_PERIOD);
+	// ConfigCpuTimer(&CpuTimer0, 200, CPU_TIMER0_PERIOD); // lower than 10us too fast, prevents other ISR from running
+	ConfigCpuTimer(&CpuTimer0, CPUFREQ_MHZ, 1000000.0 / samplingFreq_hz);
+
+//	ConfigCpuTimer(&CpuTimer1, 200, CPU_TIMER1_PERIOD);
+//	ConfigCpuTimer(&CpuTimer2, 200, CPU_TIMER2_PERIOD);
 
 	//
 	// To ensure precise timing, use write-only instructions to write to the entire
@@ -336,9 +437,10 @@ void main(void) {
 	// ConfigCpuTimer and InitCpuTimers (in F2837xS_cputimervars.h), the below
 	// settings must also be updated.
 	//
+//	CpuTimer0Regs.TCR.all = 0x4000;
 	CpuTimer0Regs.TCR.all = 0x4001;
-	CpuTimer1Regs.TCR.all = 0x4001;
-	CpuTimer2Regs.TCR.all = 0x4001;
+//	CpuTimer1Regs.TCR.all = 0x4001;
+//	CpuTimer2Regs.TCR.all = 0x4001;
 
 	//
 	// Step 5. User specific code, enable interrupts:
@@ -354,27 +456,35 @@ void main(void) {
 	// Enable Timer0 Interrupt, TINT0 in the PIE: Group 1 __interrupt 7
 	PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
 
-
 	//
 	// Enable EPWM INTn in the PIE: Group 3 interrupt 1-11
 	//
 //	PieCtrlRegs.PIEIER3.bit.INTx7 = 1; // Interrupt on EPWM7
 //	PieCtrlRegs.PIEIER3.bit.INTx8 = 1; // Interrupt on EPWM8
 
-
 	// User Configuration Functions
-	//configureLEDs();
+	// configureLEDs();
 	// GPIOGateDrivers();
 	init_ADC();
 	init_printf();
 
-	EINT;// Enable Global interrupt INTM
-	ERTM;// Enable Global realtime interrupt DBGM
+	EINT;
+	// Enable Global interrupt INTM
+	ERTM;
+	// Enable Global realtime interrupt DBGM
 
 // take conversions indefinitely in loop
 	// disableEPWM();
 
 	do {
+
+		setFreq();   // Set Output Frequency and Max Output Frequency
+		setGain();   // Set Magnitude of Waveform
+		setOffset(); // Set Offset of Waveform
+//		maxOutput_lsb = getMax();
+//		minOutput_lsb = getMin();
+//		pk_to_pk_lsb = maxOutput_lsb - minOutput_lsb;
+
 //		if (EPWM7_Up) {
 //			EPWM7_Duty += EPWM7_INC;
 //			if (EPWM7_Duty >= EPWM7_DUTY_UPPER)
@@ -468,11 +578,13 @@ void init_ADC() {
 	int idx;
 	for (idx = 0; idx < MOV_AVG_SIZE_HI; idx++) {
 		if (idx < MOV_AVG_SIZE) {
+			V1AB_Real_Buf[idx] = 0;
 			V2AB_Real_Buf[idx] = 0;
 			VDC1_Real_Buf[idx] = 0;
 			VDC2_Real_Buf[idx] = 0;
 		}
 		IL1_Real_Buf[idx] = 0;
+		IL2_Real_Buf[idx] = 0;
 	}
 
 	// ADC1 configuation
@@ -607,16 +719,15 @@ void convertADCBank(uint16_t id) {
 // epwm7_isr - EPWM2 ISR
 //
 __interrupt void epwm7_isr(void) {
-    EPwm7Regs.ETCLR.bit.INT = 1;
+	EPwm7Regs.ETCLR.bit.INT = 1;
 
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP7;
+	PieCtrlRegs.PIEACK.all = PIEACK_GROUP7;
 }
 
 //
 // InitEPwm7Example - Initialize EPWM7 configuration
 //
-void InitEPwm7Example()
-{
+void InitEPwm7Example() {
 	int HSPCLKDIV;
 	int CLKDIV;
 	double TPWM;
@@ -624,11 +735,12 @@ void InitEPwm7Example()
 	double TBPRD;
 	double EPWM7_MIN_DB;
 
-    //
-    // Setup TBCLK
-    //
-    EPwm7Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-    EPwm7Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
+	//
+	// Setup TBCLK
+	//
+	EPwm7Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up-down
+	// EPwm7Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP; // Count up
+	EPwm7Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
 
 	if (EPWM7_Freq < 200.0) {
 		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
@@ -646,7 +758,7 @@ void InitEPwm7Example()
 		EPwm7Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;
 		EPwm7Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 	}
-    switch (EPwm7Regs.TBCTL.bit.HSPCLKDIV) {
+	switch (EPwm7Regs.TBCTL.bit.HSPCLKDIV) {
 	case TB_DIV1:
 		HSPCLKDIV = 1;
 		break;
@@ -656,77 +768,77 @@ void InitEPwm7Example()
 	case TB_DIV4:
 		HSPCLKDIV = 4;
 		break;
-    }
-    switch (EPwm7Regs.TBCTL.bit.CLKDIV) {
-    	case TB_DIV1:
-    		CLKDIV = 1;
-    		break;
-    	case TB_DIV2:
-    		CLKDIV = 2;
-    		break;
-    	case TB_DIV4:
-    		CLKDIV = 4;
-    		break;
-        }
-    TPWM = 1 / (EPWM7_Freq);
+	}
+	switch (EPwm7Regs.TBCTL.bit.CLKDIV) {
+	case TB_DIV1:
+		CLKDIV = 1;
+		break;
+	case TB_DIV2:
+		CLKDIV = 2;
+		break;
+	case TB_DIV4:
+		CLKDIV = 4;
+		break;
+	}
+	TPWM = 1 / (EPWM7_Freq);
 	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
 	TBPRD = TPWM / (2.0 * TBCLK);
 	EPwm7Regs.TBPRD = TBPRD; // Set timer period
 	EPwm7Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
 	EPwm7Regs.TBCTR = 0x0000;                     // Clear counter
 
-
-
-    //
-    // Set EMP7A,EPWM7B Low on Over-voltage/Over-current condition
-    //
+	//
+	// Set EMP7A,EPWM7B Low on Over-voltage/Over-current condition
+	//
 	EALLOW;
-    EPwm7Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
-    EPwm7Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
-    EPwm7Regs.TZCLR.bit.OST = 1;
-    EDIS;
+	EPwm7Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
+	EPwm7Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
+	EPwm7Regs.TZCLR.bit.OST = 1;
+
+	// Enable Single Software Force
+	EPwm7Regs.AQSFRC.bit.ACTSFA = 0x2; // Output A High
+	EPwm7Regs.AQSFRC.bit.ACTSFB = 0x2; // Output B High
+	EDIS;
+
+	//
+	// Set Duty Cycle
+	//
+	EPwm7Regs.CMPA.bit.CMPA = EPWM7_Duty * EPwm7Regs.TBPRD;
+
+	//
+	// Set actions
+	//
+    EPwm7Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
+    EPwm7Regs.AQCTLA.bit.CAD = AQ_CLEAR;
+
+	EPwm7Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
+	EPwm7Regs.AQCTLB.bit.CAD = AQ_SET;
+
+
+	//
+	// Active High complementary PWMs - setup the deadband
+	//
+	EPWM7_MIN_DB = DB_TIME / TBCLK;
+
+    EPwm7Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+    EPwm7Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
+    EPwm7Regs.DBCTL.bit.IN_MODE = DBA_ALL;
+    EPwm7Regs.DBRED.bit.DBRED = EPWM7_MIN_DB;
+    EPwm7Regs.DBFED.bit.DBFED = EPWM7_MIN_DB;
 
     //
-    // Set Duty Cycle
+    // Interrupt where we will modify the deadband
     //
-    EPwm7Regs.CMPA.bit.CMPA = EPWM7_Duty * EPwm7Regs.TBPRD;
-
-    //
-    // Set actions
-    //
-//    EPwm7Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
-//    EPwm7Regs.AQCTLA.bit.CAD = AQ_CLEAR;
-
-    EPwm7Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
-    EPwm7Regs.AQCTLB.bit.CAD = AQ_SET;
-
-
-    //
-    // Active High complementary PWMs - setup the deadband
-    //
-    EPWM7_MIN_DB = DB_TIME / TBCLK;
-
-//    EPwm7Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-//    EPwm7Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
-//    EPwm7Regs.DBCTL.bit.IN_MODE = DBA_ALL;
-//    EPwm7Regs.DBRED.bit.DBRED = EPWM7_MIN_DB;
-//    EPwm7Regs.DBFED.bit.DBFED = EPWM7_MIN_DB;
-//
-//    //
-//    // Interrupt where we will modify the deadband
-//    //
-//    EPwm7Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
-//    EPwm7Regs.ETSEL.bit.INTEN = 1;                // Enable INT
-//    EPwm7Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
-    enablePWMBuffer();
+    EPwm7Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
+    EPwm7Regs.ETSEL.bit.INTEN = 1;                // Enable INT
+    EPwm7Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
+	enablePWMBuffer();
 }
-
 
 //
 // InitEPwm8Example - Initialize EPWM8 configuration
 //
-void InitEPwm8Example()
-{
+void InitEPwm8Example() {
 	int HSPCLKDIV;
 	int CLKDIV;
 	double TPWM;
@@ -734,11 +846,11 @@ void InitEPwm8Example()
 	double TBPRD;
 	double EPWM8_MIN_DB;
 
-    //
-    // Setup TBCLK
-    //
-    EPwm8Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
-    EPwm8Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
+	//
+	// Setup TBCLK
+	//
+	EPwm8Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
+	EPwm8Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
 
 	if (EPWM8_Freq < 200.0) {
 		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV4;
@@ -756,7 +868,7 @@ void InitEPwm8Example()
 		EPwm8Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;
 		EPwm8Regs.TBCTL.bit.CLKDIV = TB_DIV1;
 	}
-    switch (EPwm8Regs.TBCTL.bit.HSPCLKDIV) {
+	switch (EPwm8Regs.TBCTL.bit.HSPCLKDIV) {
 	case TB_DIV1:
 		HSPCLKDIV = 1;
 		break;
@@ -766,69 +878,67 @@ void InitEPwm8Example()
 	case TB_DIV4:
 		HSPCLKDIV = 4;
 		break;
-    }
-    switch (EPwm8Regs.TBCTL.bit.CLKDIV) {
-    	case TB_DIV1:
-    		CLKDIV = 1;
-    		break;
-    	case TB_DIV2:
-    		CLKDIV = 2;
-    		break;
-    	case TB_DIV4:
-    		CLKDIV = 4;
-    		break;
-        }
-    TPWM = 1 / (EPWM8_Freq);
+	}
+	switch (EPwm8Regs.TBCTL.bit.CLKDIV) {
+	case TB_DIV1:
+		CLKDIV = 1;
+		break;
+	case TB_DIV2:
+		CLKDIV = 2;
+		break;
+	case TB_DIV4:
+		CLKDIV = 4;
+		break;
+	}
+	TPWM = 1 / (EPWM8_Freq);
 	TBCLK = 1.0 / (EPWMCLK / (HSPCLKDIV * CLKDIV));
 	TBPRD = TPWM / (2.0 * TBCLK);
 	EPwm8Regs.TBPRD = TBPRD; // Set timer period
 	EPwm8Regs.TBPHS.bit.TBPHS = 0x0000;           // Phase is 0
 	EPwm8Regs.TBCTR = 0x0000;                     // Clear counter
 
-
-    //
-    // Set EMP8A, EPWM8B Low on Over-voltage/Over-current condition
-    //
+	//
+	// Set EMP8A, EPWM8B Low on Over-voltage/Over-current condition
+	//
 	EALLOW;
-    EPwm8Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
-    EPwm8Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
-    EPwm8Regs.TZCLR.bit.OST = 1;
-    EDIS;
+	EPwm8Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
+	EPwm8Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
+	EPwm8Regs.TZCLR.bit.OST = 1;
+	EDIS;
 
-    //
-    // Set Duty Cycle
-    //
-    EPwm8Regs.CMPA.bit.CMPA = (1.0 - EPWM8_Duty) * EPwm8Regs.TBPRD;
+	//
+	// Set Duty Cycle
+	//
+	EPwm8Regs.CMPA.bit.CMPA = (1.0 - EPWM8_Duty) * EPwm8Regs.TBPRD;
 
-    //
-    // Set actions
-    //
-    EPwm8Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
-    EPwm8Regs.AQCTLA.bit.CAD = AQ_CLEAR;
+	//
+	// Set actions
+	//
+	EPwm8Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
+	EPwm8Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 
-    EPwm8Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
-    EPwm8Regs.AQCTLB.bit.CAD = AQ_SET;
+	EPwm8Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
+	EPwm8Regs.AQCTLB.bit.CAD = AQ_SET;
 
+	//
+	// Active High complementary PWMs - setup the deadband
+	//
+	EPWM8_MIN_DB = DB_TIME / TBCLK;
 
-    //
-    // Active High complementary PWMs - setup the deadband
-    //
-    EPWM8_MIN_DB = DB_TIME / TBCLK;
+	EPwm8Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+	EPwm8Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
+	EPwm8Regs.DBCTL.bit.IN_MODE = DBA_ALL;
+	EPwm8Regs.DBRED.bit.DBRED = EPWM8_MIN_DB;
+	EPwm8Regs.DBFED.bit.DBFED = EPWM8_MIN_DB;
 
-    EPwm8Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-    EPwm8Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
-    EPwm8Regs.DBCTL.bit.IN_MODE = DBA_ALL;
-    EPwm8Regs.DBRED.bit.DBRED = EPWM8_MIN_DB;
-    EPwm8Regs.DBFED.bit.DBFED = EPWM8_MIN_DB;
-
-    //
-    // Interrupt where we will modify the deadband
-    //
-    EPwm8Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
-    EPwm8Regs.ETSEL.bit.INTEN = 1;                // Enable INT
-    EPwm8Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
+	//
+	// Interrupt where we will modify the deadband
+	//
+	EPwm8Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
+	EPwm8Regs.ETSEL.bit.INTEN = 1;                // Enable INT
+	EPwm8Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
+	enablePWMBuffer();
 }
-
 
 void storeADCValues() {
 //	// Digital Values
@@ -870,17 +980,25 @@ void storeADCValues() {
 
 
 	// Actual Values
+	V1AB_Real = (2.0 * V1AB_ADC) - 6249.0;
+
 	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
 
 	// VDC1_Real = VDC1_ADC;
-	VDC1_Real = -450.709 + 2.19091*VDC1_ADC;
+	VDC1_Real = -450.709 + 2.19091 * VDC1_ADC;
+	//VDC1_Real = (3.3 * VDC1_ADC/4095.0 - 0.165) * 1700.0;
 
 	//VDC2_Real = VDC2_ADC;
-	VDC2_Real = -468.707 + 2.307*VDC2_ADC;
+	VDC2_Real = -468.707 + 2.307 * VDC2_ADC;
+//	VDC2_Real = (3.3 * VDC2_ADC/4095.0 - 0.165) * (-1700.0);
 
-	// IL1_Real = IL1_ADC;
-	//IL1_Real = 1206.8 - 0.4*IL1_ADC;
-	IL1_Real = 1676.67 - 0.555556*IL1_ADC;
+	//IL1_Real = IL1_ADC;
+	IL1_Real = 730.05 - 0.25 * IL1_ADC;
+	//IL1_Real = (3.3 * IL1_ADC/4095.0 - 1.65);
+
+
+	IL2_Real = (3.3 * (IL2_ADC-2070.0)/4095.0) * 2.0 * 36 * 17;
+
 }
 
 void printAndyBoard(void) {
@@ -911,12 +1029,20 @@ char checkVDC12() {
 	return 0;
 }
 
+char checkIL1() {
+	if (IL1_Real_Avg > IL1_LIMIT)
+		return 1;
+	return 0;
+}
+
 void disableEPWM(void) {
-//	EALLOW;
-//	EPwm7Regs.TZFRC.bit.OST = 1;
-//	EPwm8Regs.TZFRC.bit.OST = 1;
-//	EDIS;
+
 	GPIO_WritePin(69, 0);
+	EALLOW;
+	EPwm7Regs.TZFRC.bit.OST = 1;
+	EPwm8Regs.TZFRC.bit.OST = 1;
+	EDIS;
+
 }
 
 void haltOverVoltage(void) {
@@ -925,11 +1051,13 @@ void haltOverVoltage(void) {
 //	flag |= checkVDC2();
 //	flag |= checkV2AB();
 
-	flag |= checkVDC12();
+//	flag |= checkVDC12();
+	flag |= checkIL1();
 
 	if (flag) {
 		disableEPWM();
-		while (1) {}
+		while (1) {
+		}
 	}
 }
 
@@ -937,8 +1065,7 @@ void hysteresisControl() {
 	if (up && (V2AB_Real_Avg >= 9.0)) {
 		up = 0;
 		toggleBlueLED();
-	}
-	else if ((!up) && (V2AB_Real_Avg <= -9.0)) {
+	} else if ((!up) && (V2AB_Real_Avg <= -9.0)) {
 		up = 1;
 		toggleBlueLED();
 	}
@@ -974,37 +1101,123 @@ void toggleGPIOPWM4() {
 	GPIO_WritePin(PWM4_GPIO, PWM4_state);
 }
 
+void PWM7HysteresisControl() {
+	// Initially discharging
+	if (PWM7_seekUpperBand == 2) {
+		EPwm7Regs.CMPA.bit.CMPA = EPwm7Regs.TBPRD;
+		PWM7_seekUpperBand = 0;
+	}
+
+	// Seeking upper band
+	if (PWM7_seekUpperBand == 1) {
+
+		if (IL1_Real_Avg > IL1_Hyst_SetPoint + HYSTERESIS_BAND) {
+			// Switch to Discharge
+
+
+			PWM7_seekUpperBand = 0;
+		}
+		else
+			EPwm7Regs.AQSFRC.bit.OTSFB = 0x1; // Output B High to charge inductor
+
+	}
+	// Seeking Lower Band
+	else if (PWM7_seekUpperBand == 0) {
+
+		if (IL1_Real_Avg < IL1_Hyst_SetPoint - HYSTERESIS_BAND) {
+			// Switch to Charging
+			PWM7_seekUpperBand = 1;
+		}
+		else
+			EPwm7Regs.AQSFRC.bit.OTSFA = 0x1; // Output A High to discharge inductor
+	}
+
+}
+
 __interrupt void cpu_timer0_isr(void) {
 	//printf("timer0\n\r");
 
-
-
 	storeADCValues(); // Store and Convert ADC Values in variables in memory
 	movingAvgADC();
+	haltOverVoltage();
 //	toggleGPIOPWM1();
 //	toggleGPIOPWM2();
 //	toggleGPIOPWM3();
 //	toggleGPIOPWM4();
 
-	// haltOverVoltage();
+
 
 	// hysteresisControl();
 
+//    //
+//    // Start Cpu Timer1 to indicate begin of interrupt
+//    //
+//    CpuTimer1Regs.TCR.all = 0x0000;
 
-	// Acknowledge this __interrupt to receive more __interrupts from group 1
+	//
+	// Write current sine value to buffered DAC
+	//
+	DAC_PTR[DAC_NUM]->DACVALS.all = IL1_Ref;
+
+	//
+	// Log current sine value
+	//
+//	dlog(sgenIL1a_out);
+
+	//
+	// Compute next sine value
+	//
+	sgenIL1a.calc(&sgenIL1a);
+	sgenIL1b.calc(&sgenIL1b);
+	// triwave1.calc(&triwave1);
+
+	//
+	// Scale next sine value
+	//
+	//IL1_Ref = (sgenIL1a.out + 32768) >> 4; // A
+	//IL1_Ref = (sgenIL1b.out + 32768) >> 4; // B
+	IL1_Ref = ((sgenIL1a.out + sgenIL1b.out + 32768) >> 4); // A+B
+	// IL1_Ref = ((triwave1.out + 32768) >> 4); // Ramp
+
+	// IL1_Ref = (IL1_Ref/4095.0) * 0.3 + 0.5;
+	// IL1_Hyst_SetPoint = (IL1_Ref/4095.0) * 1.5;
+
+	// PWM7CurrentControl();
+	PWM7HysteresisControl();
+
+	//
+	// Acknowledge this interrupt to receive more interrupts from group 1
+	//
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+
+//    //
+//    // Stop Cpu Timer1 to indicate end of interrupt
+//    //
+//    CpuTimer1Regs.TCR.all = 0x0010;
+//
+//    //
+//    // Calculate interrupt duration in cycles
+//    //
+//    interruptCycles = 0xFFFFFFFFUL - CpuTimer1Regs.TIM.all;
+//
+//    //
+//    // Calculate interrupt duration in micro seconds
+//    //
+//    interruptDuration_us = cpuPeriod_us * interruptCycles;
+//
+//    //
+//    // Reload Cpu Timer1
+//    //
+//    CpuTimer1Regs.TCR.all = 0x0030;
 }
 
 __interrupt void cpu_timer1_isr(void) {
 	//printf("timer1\n\r");
 
-
-
 }
 
 __interrupt void cpu_timer2_isr(void) {
 	//printf("timer2\n\r");
-
 
 }
 
@@ -1012,13 +1225,7 @@ void movingAvgADC() {
 	if (buf_idx >= MOV_AVG_SIZE)
 		buf_idx = 0;
 	if (buf_idx_hi >= MOV_AVG_SIZE_HI)
-			buf_idx_hi = 0;
-
-	// V2AB
-	V2AB_Real_BufSum -= V2AB_Real_Buf[buf_idx];
-	V2AB_Real_Buf[buf_idx] = V2AB_Real;
-	V2AB_Real_BufSum += V2AB_Real_Buf[buf_idx];
-	V2AB_Real_Avg = V2AB_Real_BufSum / MOV_AVG_SIZE;
+		buf_idx_hi = 0;
 
 	// VDC1
 	VDC1_Real_BufSum -= VDC1_Real_Buf[buf_idx];
@@ -1032,13 +1239,33 @@ void movingAvgADC() {
 	VDC2_Real_BufSum += VDC2_Real_Buf[buf_idx];
 	VDC2_Real_Avg = VDC2_Real_BufSum / MOV_AVG_SIZE;
 
+	// DC Link
+	VDC12_Real_Avg = VDC1_Real_Avg - VDC2_Real_Avg;
+
+	// V1AB
+	V1AB_Real_BufSum -= V1AB_Real_Buf[buf_idx];
+	V1AB_Real_Buf[buf_idx] = V1AB_Real;
+	V1AB_Real_BufSum += V1AB_Real_Buf[buf_idx];
+	V1AB_Real_Avg = V1AB_Real_BufSum / MOV_AVG_SIZE;
+
+	// V2AB
+	V2AB_Real_BufSum -= V2AB_Real_Buf[buf_idx];
+	V2AB_Real_Buf[buf_idx] = V2AB_Real;
+	V2AB_Real_BufSum += V2AB_Real_Buf[buf_idx];
+	V2AB_Real_Avg = V2AB_Real_BufSum / MOV_AVG_SIZE;
+
 	// IL1
 	IL1_Real_BufSum -= IL1_Real_Buf[buf_idx_hi];
 	IL1_Real_Buf[buf_idx_hi] = IL1_Real;
 	IL1_Real_BufSum += IL1_Real_Buf[buf_idx_hi];
 	IL1_Real_Avg = IL1_Real_BufSum / MOV_AVG_SIZE_HI;
 
-	VDC12_Real_Avg = VDC1_Real_Avg - VDC2_Real_Avg;
+	// IL2
+	IL2_Real_BufSum -= IL2_Real_Buf[buf_idx_hi];
+	IL2_Real_Buf[buf_idx_hi] = IL2_Real;
+	IL2_Real_BufSum += IL2_Real_Buf[buf_idx_hi];
+	IL2_Real_Avg = IL2_Real_BufSum / MOV_AVG_SIZE_HI;
+
 
 	buf_idx++;
 	buf_idx_hi++;
@@ -1054,7 +1281,140 @@ void enablePWMBuffer() {
 	GPIO_SetupPinMux(66, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(66, GPIO_OUTPUT, GPIO_PUSHPULL);
 	GPIO_WritePin(66, 0);
+}
 
+// DAC Test Stuff
+//
+// dlog - Circular DataLog. DataLog[0] contains the next index to
+//        be overwritten
+//
+static inline void dlog(Uint16 value) {
+	DataLog[ndx] = value;
+	if (++ndx == DLOG_SIZE) {
+		ndx = 0;
+	}
+	DataLog[0] = ndx;
+}
+
+//
+// setFreq - Set the SINE frequency in sgenIL1a
+//
+static inline void setFreq(void) {
+#if SINEWAVE_TYPE==LOW_THD_SINE
+	//
+	// Range(Q0) = 0x0000 -> 0x7FFF, step_max(Q0) =
+	// (Max_Freq_hz*0x10000)/Sampling_Freq_hz
+	//
+	sgenIL1a.step_max = (maxOutputFreq_hz * 0x10000) / samplingFreq_hz;
+	sgenIL1b.step_max = (maxOutputFreq_hz * 0x10000) / samplingFreq_hz;
+
+	//
+	// Range(Q15) = 0x0000 -> 0x7FFF, freq(Q15) =
+	// (Required_Freq_hz/Max_Freq_hz)*0x8000
+	//
+	sgenIL1a.freq = ((float) outputFreqA_hz / maxOutputFreq_hz) * 0x8000;
+	sgenIL1b.freq = ((float) outputFreqB_hz / maxOutputFreq_hz) * 0x8000;
+#elif SINEWAVE_TYPE==HIGH_PRECISION_SINE
+	//
+	// Range(Q0) = 0x00000000 -> 0x7FFFFFFF, step_max(Q0) =
+	// (Max_Freq_hz*0x100000000)/Sampling_Freq_hz
+	//
+	sgenIL1a.step_max = (maxOutputFreq_hz*0x100000000)/samplingFreq_hz;
+	sgenIL1b.step_max = (maxOutputFreq_hz*0x100000000)/samplingFreq_hz;
+
+	//
+	// Range(Q31) = 0x00000000 -> 0x7FFFFFFF, freq(Q31) =
+	// (Required_Freq_hz/Max_Freq_hz)*0x80000000
+	//
+	sgenIL1a.freq = ((float)outputFreq_hz/maxOutputFreq_hz)*0x80000000;
+	sgenIL1b.freq = ((float)outputFreq_hz/maxOutputFreq_hz)*0x80000000;
+#endif
+
+	freqResolution_hz = (float) maxOutputFreq_hz / sgenIL1a.step_max;
+}
+
+//
+// setGain - Set the gain in sgenIL1a
+//
+static inline void setGain(void) {
+	sgenIL1a.gain = waveformGainA * 0x7FFF;   // Range(Q15) = 0x0000 -> 0x7FFF
+	sgenIL1b.gain = waveformGainB * 0x7FFF;   // Range(Q15) = 0x0000 -> 0x7FFF
+}
+
+//
+// setOffset - Set the offset in sgenIL1a
+//
+static inline void setOffset(void) {
+	sgenIL1a.offset = waveformOffsetA * 0x7FFF; // Range(Q15) = 0x8000 -> 0x7FFF
+	sgenIL1b.offset = waveformOffsetB * 0x7FFF; // Range(Q15) = 0x8000 -> 0x7FFF
+}
+
+//
+// getMax - Get the max value in the data log
+//
+static inline Uint16 getMax(void) {
+	Uint16 index = 0;
+	Uint16 tempMax = 0;
+
+	for (index = 1; index < DLOG_SIZE; index++) {
+		if (tempMax < DataLog[index]) {
+			tempMax = DataLog[index];
+		}
+	}
+
+	return tempMax;
+}
+
+//
+// getMin - Get the min value in the data log
+//
+static inline Uint16 getMin(void) {
+	Uint16 index = 0;
+	Uint16 tempMin = 0xFFFF;
+
+	for (index = 1; index < DLOG_SIZE; index++) {
+		if (tempMin > DataLog[index]) {
+			tempMin = DataLog[index];
+		}
+	}
+	return tempMin;
+}
+
+//
+// configureDAC - Enable and configure the requested DAC module
+//
+void configureDAC(Uint16 dac_num) {
+	EALLOW;
+
+	DAC_PTR[dac_num]->DACCTL.bit.DACREFSEL = REFERENCE;
+	DAC_PTR[dac_num]->DACOUTEN.bit.DACOUTEN = 1;
+	DAC_PTR[dac_num]->DACVALS.all = 0;
+
+	DELAY_US(10); // Delay for buffered DAC to power up
+
+	EDIS;
+}
+
+//
+// configureWaveform - Configure the SINE waveform
+//
+void configureWaveform(void) {
+	sgenIL1a.alpha = 0; // Range(16) = 0x0000 -> 0xFFFF
+	sgenIL1b.alpha = 0;
+	setFreq();
+	setGain();
+	setOffset();
+}
+
+void PWM7CurrentControl() {
+	float EPWM7_NewDuty = 0.5;
+
+	EPWM7_NewDuty = EPWM7B_MIN_DUTY + (IL1_Ref/4095.0)*(EPWM7B_MAX_DUTY - EPWM7B_MIN_DUTY);
+	if (EPWM7_NewDuty > EPWM7B_MAX_DUTY)
+		EPWM7_NewDuty = EPWM7B_MAX_DUTY;
+	if (EPWM7_NewDuty < EPWM7B_MIN_DUTY)
+		EPWM7_NewDuty = EPWM7B_MIN_DUTY;
+	EPwm7Regs.CMPA.bit.CMPA = EPWM7_NewDuty * EPwm7Regs.TBPRD;
 }
 
 //

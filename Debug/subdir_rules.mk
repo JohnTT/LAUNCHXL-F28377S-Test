@@ -94,6 +94,13 @@ LAUNCHXL-F28377S-Test.obj: ../LAUNCHXL-F28377S-Test.c $(GEN_OPTS) | $(GEN_HDRS)
 	@echo 'Finished building: $<'
 	@echo ' '
 
+SINTB360.obj: C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/SINTB360.ASM $(GEN_OPTS) | $(GEN_HDRS)
+	@echo 'Building file: $<'
+	@echo 'Invoking: C2000 Compiler'
+	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/controlSUITE/libs/dsp/SGEN/v101/include" --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="SINTB360.d" $(GEN_OPTS__FLAG) "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
 profilec.obj: C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/profilec.asm $(GEN_OPTS) | $(GEN_HDRS)
 	@echo 'Building file: $<'
 	@echo 'Invoking: C2000 Compiler'
@@ -101,10 +108,24 @@ profilec.obj: C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/profile
 	@echo 'Finished building: $<'
 	@echo ' '
 
+rampgc.obj: C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/rampgc.asm $(GEN_OPTS) | $(GEN_HDRS)
+	@echo 'Building file: $<'
+	@echo 'Invoking: C2000 Compiler'
+	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/controlSUITE/libs/dsp/SGEN/v101/include" --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="rampgc.d" $(GEN_OPTS__FLAG) "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
 sci_io.obj: ../sci_io.c $(GEN_OPTS) | $(GEN_HDRS)
 	@echo 'Building file: $<'
 	@echo 'Invoking: C2000 Compiler'
 	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/controlSUITE/libs/dsp/SGEN/v101/include" --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="sci_io.d" $(GEN_OPTS__FLAG) "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
+sgti1c.obj: C:/ti/controlSUITE/libs/dsp/SGEN/v101/source/C28x_SGEN_LIB/sgti1c.asm $(GEN_OPTS) | $(GEN_HDRS)
+	@echo 'Building file: $<'
+	@echo 'Invoking: C2000 Compiler'
+	"C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/bin/cl2000" -ml -mt --float_support=fpu32 --tmu_support=tmu0 --cla_support=cla0 --vcu_support=vcu0 --include_path="C:/ti/controlSUITE/libs/dsp/SGEN/v101/include" --include_path="C:/ti/ccsv6/tools/compiler/c2000_15.12.3.LTS/include" --include_path="/packages/ti/xdais" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_headers/include" --include_path="C:/ti/controlSUITE/device_support/F2837xS/v180/F2837xS_common/include" --include_path="C:/ti/controlSUITE/libs/math/IQmath/v160/include" --include_path="C:/ti/controlSUITE/libs/math/FPUfastRTS/V100/include" --advice:performance=all -g --define="_DEBUG" --define=_FLASH --define=_LAUNCHXL_F28377S --define="LARGE_MODEL" --quiet --diag_warning=225 --verbose_diagnostics --issue_remarks --cdebug_asm_data --output_all_syms --preproc_with_compile --preproc_dependency="sgti1c.d" $(GEN_OPTS__FLAG) "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
