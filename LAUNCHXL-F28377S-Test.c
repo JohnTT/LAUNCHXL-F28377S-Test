@@ -48,31 +48,22 @@
 #define LED_GPIO_RED    12
 #define LED_GPIO_BLUE	13
 
-#define PWM1_GPIO	12
-#define PWM2_GPIO	13
-#define PWM3_GPIO	14
-#define PWM4_GPIO	15
-
 // Over-voltage / Over-current Limit
-#define VDC1_LIMIT 9.0
-#define VDC2_LIMIT 9.0
-#define VDC12_LIMIT 20.0
+#define VDC1_LIMIT 200.0
+#define VDC2_LIMIT 200.0
+#define VDC12_LIMIT 400.0
 
 #define IL1_LIMIT 3.0
+#define IL4_LIMIT 3.0
 
-#define EPWM7B_MIN_DUTY 0.2
-#define EPWM7B_MAX_DUTY 0.7
 
-#define V2AB_LIMIT 9.0
+#define V2AB_LIMIT 200.0
 
 // Analog to Digital (ADC)
 #define MOV_AVG_SIZE_HI 256
 #define MOV_AVG_SIZE 128
 
 #define ACQPS_TIME 88
-#define EPWM7_DUTY_UPPER 0.5
-#define EPWM7_DUTY_LOWER 0.1
-#define EPWM7_INC 0.02
 
 enum ADCINID {
 	ADCINID_A0 = 0x00,
@@ -124,16 +115,7 @@ volatile FILE *fid;
 char blueLED_state = 0;
 char redLED_state = 0;
 
-// GPIO PWM pin states
-char PWM1_state = 0;
-char PWM2_state = 0;
-char PWM3_state = 0;
-char PWM4_state = 0;
 
-// Hysteresis Limits
-float CMPHI = 8.0;
-float CMPLO = -8.0;
-char up = 1;
 
 //
 // Analog to Digital (ADC)
@@ -161,6 +143,8 @@ uint16_t IL1_ADC = 0;
 // Actual Values
 uint16_t buf_idx = 0;
 uint16_t buf_idx_hi = 0;
+char MovAvgFirstPass = 1;
+
 float VC4_Real = 0;
 
 float V1AB_Real = 0;
@@ -174,7 +158,13 @@ float V2AB_Real_BufSum = 0;
 float V2AB_Real_Avg = 0;
 
 float VC3_Real = 0;
+
 float IL4_Real = 0;
+float IL4_Real_Buf[MOV_AVG_SIZE_HI];
+float IL4_Real_BufSum = 0;
+float IL4_Real_Avg = 0;
+float IL4_Offset = 0.0;
+
 float IL3_Real = 0;
 
 // J5 and J7
@@ -199,12 +189,10 @@ float IL1_Real_Avg = 0;
 
 unsigned int IL1_Ref = 0;
 float IL1_Hyst_SetPoint = 2.0;
+float IL1_Offset = 0.0;
 
 float IL2_Real = 0;
-float IL2_Real_Buf[MOV_AVG_SIZE_HI];
-float IL2_Real_BufSum = 0;
-float IL2_Real_Avg = 0;
-unsigned int IL2_Ref = 0;
+
 
 // EPWM
 double EPWM7_Freq = 10000.0 * 2.0;
@@ -250,6 +238,23 @@ Uint16 maxOutput_lsb = 0;
 Uint16 minOutput_lsb = 0;
 Uint16 pk_to_pk_lsb = 0;
 
+//for PI controller
+double PI_err_cur = 0.0; // current error
+double PI_err_old = 0.0; // old error
+double PI_err_int = 0.0; // integral of error
+double PI_output = 0.0; // PI Output
+
+double PI_Kp = 3.0;
+double PI_Ki = 10.0;
+
+double VDC12_SetPoint = 50.0;
+double IL4_Saturation = 2.5;
+double delta_t = 0.000005;
+
+double Vgrid_Max = 20.0;
+
+
+
 //
 // Function Prototypes
 //
@@ -262,18 +267,6 @@ void init_printf(void);
 void printAndyBoard(void);
 void toggleBlueLED(void);
 void toggleRedLED(void);
-
-// GPIO-PWM Functions
-void init_GPIOPWM(void);
-void toggleGPIOPWM1(void);
-void toggleGPIOPWM2(void);
-void toggleGPIOPWM3(void);
-void toggleGPIOPWM4(void);
-
-void setGPIOPWM1Freq(double freq);
-void setGPIOPWM2Freq(double freq);
-void setGPIOPWM3Freq(double freq);
-void setGPIOPWM4Freq(double freq);
 
 // Analog to Digital (ADC)
 void init_ADC(void);
@@ -288,8 +281,6 @@ char checkVDC2(void);
 char checkVDC12(void);
 char checkV2AB(void);
 
-void hysteresisControl(void);
-
 // EPWM
 void InitEPwm7Example(void);
 void InitEPwm8Example(void);
@@ -297,9 +288,9 @@ __interrupt void epwm7_isr(void);
 __interrupt void epwm8_isr(void);
 void enablePWMBuffer(void);
 
-void PWM7CurrentControl(void);
-
 void PWM7HysteresisControl(void);
+
+void calcPI(void);
 
 // CPU Timers
 __interrupt void cpu_timer0_isr(void);
@@ -389,7 +380,7 @@ void main(void) {
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 0;
 	EDIS;
 
-	InitEPwm7Example();
+	//InitEPwm7Example();
 	//InitEPwm8Example();
 
 	EALLOW;
@@ -402,6 +393,7 @@ void main(void) {
 	//
 	cpuPeriod_us = (1.0 / CPUFREQ_MHZ);
 	samplingPeriod_us = (1000000.0 / samplingFreq_hz);
+	delta_t = 1.0 / samplingFreq_hz; // delta_t for PI
 
 	//
 	// Initialize datalog
@@ -426,7 +418,7 @@ void main(void) {
 
 	// Configure CPU-Timer 0,1,2 to __interrupt
 	// ConfigCpuTimer(&CpuTimer0, 200, CPU_TIMER0_PERIOD); // lower than 10us too fast, prevents other ISR from running
-	ConfigCpuTimer(&CpuTimer0, CPUFREQ_MHZ, 1000000.0 / samplingFreq_hz);
+	ConfigCpuTimer(&CpuTimer0, CPUFREQ_MHZ, 1000000.0 / samplingFreq_hz); // set Timer0 Frequency to 200kHz
 
 //	ConfigCpuTimer(&CpuTimer1, 200, CPU_TIMER1_PERIOD);
 //	ConfigCpuTimer(&CpuTimer2, 200, CPU_TIMER2_PERIOD);
@@ -474,10 +466,7 @@ void main(void) {
 	// Enable Global realtime interrupt DBGM
 
 // take conversions indefinitely in loop
-	// disableEPWM();
-
 	do {
-
 		setFreq();   // Set Output Frequency and Max Output Frequency
 		setGain();   // Set Magnitude of Waveform
 		setOffset(); // Set Offset of Waveform
@@ -532,30 +521,6 @@ void init_LEDs() {
 	GPIO_WritePin(LED_GPIO_RED, 1);
 }
 
-void init_GPIOPWM() {
-	// Ken Drives
-	// PWM1+
-	InitGpio();
-	GPIO_SetupPinMux(PWM1_GPIO, GPIO_MUX_CPU1, 0);
-	GPIO_SetupPinOptions(PWM1_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	GPIO_WritePin(PWM1_GPIO, 0);
-
-	// PWM2+
-	GPIO_SetupPinMux(PWM2_GPIO, GPIO_MUX_CPU1, 0);
-	GPIO_SetupPinOptions(PWM2_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	GPIO_WritePin(PWM2_GPIO, 0);
-
-	// PWM3+
-	GPIO_SetupPinMux(PWM3_GPIO, GPIO_MUX_CPU1, 0);
-	GPIO_SetupPinOptions(PWM3_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	GPIO_WritePin(PWM3_GPIO, 0);
-
-	// PWM4+
-	GPIO_SetupPinMux(PWM4_GPIO, GPIO_MUX_CPU1, 0);
-	GPIO_SetupPinOptions(PWM4_GPIO, GPIO_OUTPUT, GPIO_PUSHPULL);
-	GPIO_WritePin(PWM4_GPIO, 0);
-}
-
 void init_printf() {
 	EALLOW;
 	GpioCtrlRegs.GPCMUX2.bit.GPIO84 = 1;
@@ -584,7 +549,7 @@ void init_ADC() {
 			VDC2_Real_Buf[idx] = 0;
 		}
 		IL1_Real_Buf[idx] = 0;
-		IL2_Real_Buf[idx] = 0;
+		IL4_Real_Buf[idx] = 0;
 	}
 
 	// ADC1 configuation
@@ -960,7 +925,7 @@ void storeADCValues() {
 //	ANALOG_ADC = sampleADC(ADCINID_B3);
 //	IL1_ADC = sampleADC(ADCINID_A4);
 
-	// Optimization
+	// Store Results of ADC Conversion in memory
 	SGND51R_ADC = AdcaResultRegs.ADCRESULT6;
 	VC4_ADC = AdcbResultRegs.ADCRESULT1;
 	V2AB_ADC = AdcbResultRegs.ADCRESULT4;
@@ -979,25 +944,21 @@ void storeADCValues() {
 	IL1_ADC = AdcaResultRegs.ADCRESULT4;
 
 
-	// Actual Values
+	// Convert ADC Values to real values of Current and Voltage
 	V1AB_Real = (2.0 * V1AB_ADC) - 6249.0;
 
-	V2AB_Real = (2.0 * V2AB_ADC) - 6234.0;
+	V2AB_Real = (2.17391 * V2AB_ADC) - 6777.09;
 
 	// VDC1_Real = VDC1_ADC;
-	VDC1_Real = -450.709 + 2.19091 * VDC1_ADC;
-	//VDC1_Real = (3.3 * VDC1_ADC/4095.0 - 0.165) * 1700.0;
+	VDC1_Real = -450.709 + 2.19091 * VDC1_ADC;;
 
 	//VDC2_Real = VDC2_ADC;
 	VDC2_Real = -468.707 + 2.307 * VDC2_ADC;
-//	VDC2_Real = (3.3 * VDC2_ADC/4095.0 - 0.165) * (-1700.0);
 
 	//IL1_Real = IL1_ADC;
-	IL1_Real = 730.05 - 0.25 * IL1_ADC;
-	//IL1_Real = (3.3 * IL1_ADC/4095.0 - 1.65);
+	IL1_Real = 729.75 - 0.25 * IL1_ADC - IL1_Offset;
 
-
-	IL2_Real = (3.3 * (IL2_ADC-2070.0)/4095.0) * 2.0 * 36 * 17;
+	IL4_Real = 800.25 - 0.25 * IL4_ADC - IL4_Offset;
 
 }
 
@@ -1030,19 +991,47 @@ char checkVDC12() {
 }
 
 char checkIL1() {
-	if (IL1_Real_Avg > IL1_LIMIT)
+	// Check if IL1 current within safe range
+	if (IL1_Real_Avg > IL1_LIMIT || IL1_Real_Avg < -1.0*IL1_LIMIT)
 		return 1;
+
+	// Check if first pass for moving average
+	if (buf_idx_hi >= MOV_AVG_SIZE_HI && MovAvgFirstPass == 1) {
+		MovAvgFirstPass = 0;
+
+		// Error if first pass average is greater than 10x Hysteresis Band
+		if ((IL1_Real_Avg > 10.0*HYSTERESIS_BAND) || (IL1_Real_Avg < -10.0*HYSTERESIS_BAND)) {
+			return 1;
+		}
+		IL1_Offset = IL1_Real_Avg;
+	}
+	return 0;
+}
+
+char checkIL4() {
+	// Check if IL4 current within safe range
+	if (IL4_Real_Avg > IL4_LIMIT || IL4_Real_Avg < -1.0*IL4_LIMIT)
+		return 1;
+
+	// Check if first pass for moving average
+	if (buf_idx_hi >= MOV_AVG_SIZE_HI && MovAvgFirstPass == 1) {
+		MovAvgFirstPass = 0;
+
+		// Error if first pass average is greater than 10x Hysteresis Band
+		if ((IL4_Real_Avg > 10.0*HYSTERESIS_BAND) || (IL4_Real_Avg < -10.0*HYSTERESIS_BAND)) {
+			return 1;
+		}
+		IL4_Offset = IL4_Real_Avg;
+	}
 	return 0;
 }
 
 void disableEPWM(void) {
-
-	GPIO_WritePin(69, 0);
+	GPIO_WritePin(69, 0); // Disable Hardware XOR gate buffer
 	EALLOW;
-	EPwm7Regs.TZFRC.bit.OST = 1;
-	EPwm8Regs.TZFRC.bit.OST = 1;
+	EPwm7Regs.TZFRC.bit.OST = 1; // Force Trip Zone EPWM7
+	EPwm8Regs.TZFRC.bit.OST = 1; // Force Trip Zone EPWM8
 	EDIS;
-
 }
 
 void haltOverVoltage(void) {
@@ -1053,21 +1042,12 @@ void haltOverVoltage(void) {
 
 //	flag |= checkVDC12();
 	flag |= checkIL1();
+	flag |= checkIL4();
 
 	if (flag) {
 		disableEPWM();
 		while (1) {
 		}
-	}
-}
-
-void hysteresisControl() {
-	if (up && (V2AB_Real_Avg >= 9.0)) {
-		up = 0;
-		toggleBlueLED();
-	} else if ((!up) && (V2AB_Real_Avg <= -9.0)) {
-		up = 1;
-		toggleBlueLED();
 	}
 }
 
@@ -1081,25 +1061,6 @@ void toggleRedLED() {
 	GPIO_WritePin(LED_GPIO_RED, redLED_state);
 }
 
-void toggleGPIOPWM1() {
-	PWM1_state = !PWM1_state;
-	GPIO_WritePin(PWM1_GPIO, PWM1_state);
-}
-
-void toggleGPIOPWM2() {
-	PWM2_state = !PWM2_state;
-	GPIO_WritePin(PWM2_GPIO, PWM2_state);
-}
-
-void toggleGPIOPWM3() {
-	PWM3_state = !PWM3_state;
-	GPIO_WritePin(PWM3_GPIO, PWM3_state);
-}
-
-void toggleGPIOPWM4() {
-	PWM4_state = !PWM4_state;
-	GPIO_WritePin(PWM4_GPIO, PWM4_state);
-}
 
 void PWM7HysteresisControl() {
 	// Initially discharging
@@ -1110,11 +1071,8 @@ void PWM7HysteresisControl() {
 
 	// Seeking upper band
 	if (PWM7_seekUpperBand == 1) {
-
 		if (IL1_Real_Avg > IL1_Hyst_SetPoint + HYSTERESIS_BAND) {
 			// Switch to Discharge
-
-
 			PWM7_seekUpperBand = 0;
 		}
 		else
@@ -1137,78 +1095,36 @@ void PWM7HysteresisControl() {
 __interrupt void cpu_timer0_isr(void) {
 	//printf("timer0\n\r");
 
+	calcPI(); // Calculate PI Error Output
 	storeADCValues(); // Store and Convert ADC Values in variables in memory
-	movingAvgADC();
-	haltOverVoltage();
-//	toggleGPIOPWM1();
-//	toggleGPIOPWM2();
-//	toggleGPIOPWM3();
-//	toggleGPIOPWM4();
+	movingAvgADC(); // Calculate Moving Average
+	haltOverVoltage(); // Halts CPU and disables EPWM if voltages/currents not in safe range
 
-
-
-	// hysteresisControl();
-
-//    //
-//    // Start Cpu Timer1 to indicate begin of interrupt
-//    //
-//    CpuTimer1Regs.TCR.all = 0x0000;
-
-	//
 	// Write current sine value to buffered DAC
-	//
 	DAC_PTR[DAC_NUM]->DACVALS.all = IL1_Ref;
 
-	//
 	// Log current sine value
-	//
 //	dlog(sgenIL1a_out);
 
-	//
-	// Compute next sine value
-	//
-	sgenIL1a.calc(&sgenIL1a);
-	sgenIL1b.calc(&sgenIL1b);
-	// triwave1.calc(&triwave1);
+	// Compute next current reference value
+	sgenIL1a.calc(&sgenIL1a); // cosine A
+	sgenIL1b.calc(&sgenIL1b); // cosine B
+	//triwave1.calc(&triwave1);
 
-	//
-	// Scale next sine value
-	//
+	// Scale next current reference value
 	//IL1_Ref = (sgenIL1a.out + 32768) >> 4; // A
 	//IL1_Ref = (sgenIL1b.out + 32768) >> 4; // B
 	IL1_Ref = ((sgenIL1a.out + sgenIL1b.out + 32768) >> 4); // A+B
 	// IL1_Ref = ((triwave1.out + 32768) >> 4); // Ramp
 
-	// IL1_Ref = (IL1_Ref/4095.0) * 0.3 + 0.5;
-	// IL1_Hyst_SetPoint = (IL1_Ref/4095.0) * 1.5;
+	IL1_Hyst_SetPoint = (IL1_Ref/4095.0) * 2.0;
 
-	// PWM7CurrentControl();
-	PWM7HysteresisControl();
 
-	//
+	PWM7HysteresisControl(); // Use EPWM7A,B as complementary pair for hysteresis control
+
 	// Acknowledge this interrupt to receive more interrupts from group 1
-	//
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 
-//    //
-//    // Stop Cpu Timer1 to indicate end of interrupt
-//    //
-//    CpuTimer1Regs.TCR.all = 0x0010;
-//
-//    //
-//    // Calculate interrupt duration in cycles
-//    //
-//    interruptCycles = 0xFFFFFFFFUL - CpuTimer1Regs.TIM.all;
-//
-//    //
-//    // Calculate interrupt duration in micro seconds
-//    //
-//    interruptDuration_us = cpuPeriod_us * interruptCycles;
-//
-//    //
-//    // Reload Cpu Timer1
-//    //
-//    CpuTimer1Regs.TCR.all = 0x0030;
 }
 
 __interrupt void cpu_timer1_isr(void) {
@@ -1224,8 +1140,9 @@ __interrupt void cpu_timer2_isr(void) {
 void movingAvgADC() {
 	if (buf_idx >= MOV_AVG_SIZE)
 		buf_idx = 0;
-	if (buf_idx_hi >= MOV_AVG_SIZE_HI)
+	if (buf_idx_hi >= MOV_AVG_SIZE_HI) {
 		buf_idx_hi = 0;
+	}
 
 	// VDC1
 	VDC1_Real_BufSum -= VDC1_Real_Buf[buf_idx];
@@ -1260,17 +1177,18 @@ void movingAvgADC() {
 	IL1_Real_BufSum += IL1_Real_Buf[buf_idx_hi];
 	IL1_Real_Avg = IL1_Real_BufSum / MOV_AVG_SIZE_HI;
 
-	// IL2
-	IL2_Real_BufSum -= IL2_Real_Buf[buf_idx_hi];
-	IL2_Real_Buf[buf_idx_hi] = IL2_Real;
-	IL2_Real_BufSum += IL2_Real_Buf[buf_idx_hi];
-	IL2_Real_Avg = IL2_Real_BufSum / MOV_AVG_SIZE_HI;
+	// IL4
+	IL4_Real_BufSum -= IL4_Real_Buf[buf_idx_hi];
+	IL4_Real_Buf[buf_idx_hi] = IL4_Real;
+	IL4_Real_BufSum += IL4_Real_Buf[buf_idx_hi];
+	IL4_Real_Avg = IL4_Real_BufSum / MOV_AVG_SIZE_HI;
 
 
 	buf_idx++;
 	buf_idx_hi++;
 
-	// printf("%f\n\r",IL1_Real_Avg);
+	if (V2AB_Real_Avg > Vgrid_Max)
+		Vgrid_Max = V2AB_Real_Avg;
 }
 
 void enablePWMBuffer() {
@@ -1406,15 +1324,14 @@ void configureWaveform(void) {
 	setOffset();
 }
 
-void PWM7CurrentControl() {
-	float EPWM7_NewDuty = 0.5;
-
-	EPWM7_NewDuty = EPWM7B_MIN_DUTY + (IL1_Ref/4095.0)*(EPWM7B_MAX_DUTY - EPWM7B_MIN_DUTY);
-	if (EPWM7_NewDuty > EPWM7B_MAX_DUTY)
-		EPWM7_NewDuty = EPWM7B_MAX_DUTY;
-	if (EPWM7_NewDuty < EPWM7B_MIN_DUTY)
-		EPWM7_NewDuty = EPWM7B_MIN_DUTY;
-	EPwm7Regs.CMPA.bit.CMPA = EPWM7_NewDuty * EPwm7Regs.TBPRD;
+void calcPI() {
+	PI_err_cur = VDC12_Real_Avg - VDC12_SetPoint;
+	PI_err_int = PI_err_int + delta_t * PI_err_cur;
+	PI_output = PI_Kp*PI_err_cur + PI_Ki*PI_err_int;
+	if (PI_output > IL4_Saturation || PI_output < -1.0*IL4_Saturation) {
+		PI_output = IL4_Saturation;
+	}
+	PI_output *= VDC12_Real_Avg / Vgrid_Max;
 }
 
 //
