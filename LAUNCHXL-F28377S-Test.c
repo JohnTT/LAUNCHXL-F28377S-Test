@@ -199,6 +199,7 @@ double EPWM7_Freq = 10000.0 * 2.0;
 double EPWM7_Duty = 0.5;
 
 int PWM7_seekUpperBand = 2;
+int PWM8_seekUpperBand = 2;
 
 double EPWM8_Freq = 10000.0 * 2.0;
 double EPWM8_Duty = 0.6;
@@ -245,11 +246,13 @@ double PI_err_int = 0.0; // integral of error
 double PI_output = 0.0; // PI Output
 
 double PI_Kp = 3.0;
-double PI_Ki = 10.0;
-
-double VDC12_SetPoint = 50.0;
-double IL4_Saturation = 2.5;
+double PI_Ki = 5.0;
 double delta_t = 0.000005;
+
+double VDC12_SetPoint = 30.0;
+
+double PI_IL4_Ref = 0.0;
+double IL4_Saturation = 2.5;
 
 double Vgrid_Max = 20.0;
 
@@ -380,8 +383,8 @@ void main(void) {
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 0;
 	EDIS;
 
-	//InitEPwm7Example();
-	//InitEPwm8Example();
+	InitEPwm7Example();
+	InitEPwm8Example();
 
 	EALLOW;
 	CpuSysRegs.PCLKCR0.bit.TBCLKSYNC = 1;
@@ -430,6 +433,7 @@ void main(void) {
 	// settings must also be updated.
 	//
 //	CpuTimer0Regs.TCR.all = 0x4000;
+
 	CpuTimer0Regs.TCR.all = 0x4001;
 //	CpuTimer1Regs.TCR.all = 0x4001;
 //	CpuTimer2Regs.TCR.all = 0x4001;
@@ -456,7 +460,6 @@ void main(void) {
 
 	// User Configuration Functions
 	// configureLEDs();
-	// GPIOGateDrivers();
 	init_ADC();
 	init_printf();
 
@@ -814,7 +817,7 @@ void InitEPwm8Example() {
 	//
 	// Setup TBCLK
 	//
-	EPwm8Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
+	EPwm8Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up-down
 	EPwm8Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
 
 	if (EPWM8_Freq < 200.0) {
@@ -869,12 +872,16 @@ void InitEPwm8Example() {
 	EPwm8Regs.TZCTL.bit.TZA = TZ_FORCE_LO;
 	EPwm8Regs.TZCTL.bit.TZB = TZ_FORCE_LO;
 	EPwm8Regs.TZCLR.bit.OST = 1;
+
+	// Enable Single Software Force
+	EPwm8Regs.AQSFRC.bit.ACTSFA = 0x2; // Output A High
+	EPwm8Regs.AQSFRC.bit.ACTSFB = 0x2; // Output B High
 	EDIS;
 
 	//
 	// Set Duty Cycle
 	//
-	EPwm8Regs.CMPA.bit.CMPA = (1.0 - EPWM8_Duty) * EPwm8Regs.TBPRD;
+	EPwm8Regs.CMPA.bit.CMPA = EPWM8_Duty * EPwm8Regs.TBPRD;
 
 	//
 	// Set actions
@@ -950,7 +957,7 @@ void storeADCValues() {
 	V2AB_Real = (2.17391 * V2AB_ADC) - 6777.09;
 
 	// VDC1_Real = VDC1_ADC;
-	VDC1_Real = -450.709 + 2.19091 * VDC1_ADC;;
+	VDC1_Real = -451.709 + 2.19091 * VDC1_ADC;;
 
 	//VDC2_Real = VDC2_ADC;
 	VDC2_Real = -468.707 + 2.307 * VDC2_ADC;
@@ -1089,7 +1096,34 @@ void PWM7HysteresisControl() {
 		else
 			EPwm7Regs.AQSFRC.bit.OTSFA = 0x1; // Output A High to discharge inductor
 	}
+}
 
+void PWM8HysteresisControl() {
+	// Initially discharging
+	if (PWM8_seekUpperBand == 2) {
+		EPwm8Regs.CMPA.bit.CMPA = EPwm8Regs.TBPRD;
+		PWM8_seekUpperBand = 0;
+	}
+
+	// Seeking upper band
+	if (PWM8_seekUpperBand == 1) {
+		if (IL4_Real_Avg > PI_IL4_Ref + HYSTERESIS_BAND) {
+			// Switch to Discharge
+			PWM8_seekUpperBand = 0;
+		}
+		else
+			EPwm8Regs.AQSFRC.bit.OTSFB = 0x1; // Output B High to charge inductor
+
+	}
+	// Seeking Lower Band
+	else if (PWM8_seekUpperBand == 0) {
+		if (IL4_Real_Avg < PI_IL4_Ref - HYSTERESIS_BAND) {
+			// Switch to Charging
+			PWM8_seekUpperBand = 1;
+		}
+		else
+			EPwm8Regs.AQSFRC.bit.OTSFA = 0x1; // Output A High to discharge inductor
+	}
 }
 
 __interrupt void cpu_timer0_isr(void) {
@@ -1120,7 +1154,8 @@ __interrupt void cpu_timer0_isr(void) {
 	IL1_Hyst_SetPoint = (IL1_Ref/4095.0) * 2.0;
 
 
-	PWM7HysteresisControl(); // Use EPWM7A,B as complementary pair for hysteresis control
+	PWM7HysteresisControl(); // Use EPWM7A,B as complementary pair for hysteresis control on IL1
+	PWM8HysteresisControl(); // Use EPWM8A,B as complementary pair for hysteresis control on IL4
 
 	// Acknowledge this interrupt to receive more interrupts from group 1
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
@@ -1328,10 +1363,13 @@ void calcPI() {
 	PI_err_cur = VDC12_Real_Avg - VDC12_SetPoint;
 	PI_err_int = PI_err_int + delta_t * PI_err_cur;
 	PI_output = PI_Kp*PI_err_cur + PI_Ki*PI_err_int;
-	if (PI_output > IL4_Saturation || PI_output < -1.0*IL4_Saturation) {
+	if (PI_output > IL4_Saturation) {
 		PI_output = IL4_Saturation;
 	}
-	PI_output *= VDC12_Real_Avg / Vgrid_Max;
+	else if (PI_output < -1.0*IL4_Saturation) {
+		PI_output = -1.0*IL4_Saturation;
+	}
+	PI_IL4_Ref = PI_output * V2AB_Real_Avg / Vgrid_Max;
 }
 
 //
