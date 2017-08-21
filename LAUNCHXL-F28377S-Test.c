@@ -53,8 +53,8 @@
 #define VDC2_LIMIT 200.0
 #define VDC12_LIMIT 400.0
 
-#define IL1_LIMIT 3.0
-#define IL4_LIMIT 3.0
+#define IL1_LIMIT 5.0
+#define IL4_LIMIT 5.0
 
 
 #define V2AB_LIMIT 200.0
@@ -87,7 +87,8 @@ enum ADCINID {
 #define EPWMCLK 200000000 // 200MHz
 #define DB_TIME 0.000005 // 5uS
 
-#define HYSTERESIS_BAND 0.05
+#define HYSTERESIS_BAND 0.2
+#define FIRST_PASS_LIMIT 0.5
 
 // DAC
 #define DLOG_SIZE             1024
@@ -210,8 +211,8 @@ char EPWM7_Up = 1;
 Uint16 DataLog[DLOG_SIZE];
 volatile struct DAC_REGS* DAC_PTR[4] = { 0x0, &DacaRegs, &DacbRegs, &DaccRegs };
 Uint32 samplingFreq_hz = 200000;
-Uint32 outputFreqA_hz = 13;
-Uint32 outputFreqB_hz = 17;
+Uint32 outputFreqA_hz = 95;
+Uint32 outputFreqB_hz = 5;
 Uint32 maxOutputFreq_hz = 5000;
 float waveformGainA = 0.5; // Range 0.0 -> 1.0
 float waveformOffsetA = 0.0;    // Range -1.0 -> 1.0
@@ -252,9 +253,9 @@ double delta_t = 0.000005;
 double VDC12_SetPoint = 30.0;
 
 double PI_IL4_Ref = 0.0;
-double IL4_Saturation = 2.5;
+double IL4_Saturation = 3.0;
 
-double Vgrid_Max = 20.0;
+double Vgrid_Max = 5.0;
 
 
 
@@ -957,7 +958,7 @@ void storeADCValues() {
 	V2AB_Real = (2.17391 * V2AB_ADC) - 6777.09;
 
 	// VDC1_Real = VDC1_ADC;
-	VDC1_Real = -451.709 + 2.19091 * VDC1_ADC;;
+	VDC1_Real = -451.109 + 2.19091 * VDC1_ADC;;
 
 	//VDC2_Real = VDC2_ADC;
 	VDC2_Real = -468.707 + 2.307 * VDC2_ADC;
@@ -965,7 +966,7 @@ void storeADCValues() {
 	//IL1_Real = IL1_ADC;
 	IL1_Real = 729.75 - 0.25 * IL1_ADC - IL1_Offset;
 
-	IL4_Real = 800.25 - 0.25 * IL4_ADC - IL4_Offset;
+	IL4_Real = 800.05 - 0.25 * IL4_ADC - IL4_Offset;
 
 }
 
@@ -1002,16 +1003,6 @@ char checkIL1() {
 	if (IL1_Real_Avg > IL1_LIMIT || IL1_Real_Avg < -1.0*IL1_LIMIT)
 		return 1;
 
-	// Check if first pass for moving average
-	if (buf_idx_hi >= MOV_AVG_SIZE_HI && MovAvgFirstPass == 1) {
-		MovAvgFirstPass = 0;
-
-		// Error if first pass average is greater than 10x Hysteresis Band
-		if ((IL1_Real_Avg > 10.0*HYSTERESIS_BAND) || (IL1_Real_Avg < -10.0*HYSTERESIS_BAND)) {
-			return 1;
-		}
-		IL1_Offset = IL1_Real_Avg;
-	}
 	return 0;
 }
 
@@ -1020,14 +1011,21 @@ char checkIL4() {
 	if (IL4_Real_Avg > IL4_LIMIT || IL4_Real_Avg < -1.0*IL4_LIMIT)
 		return 1;
 
-	// Check if first pass for moving average
+	return 0;
+}
+
+char checkFirstPass() {
 	if (buf_idx_hi >= MOV_AVG_SIZE_HI && MovAvgFirstPass == 1) {
 		MovAvgFirstPass = 0;
 
 		// Error if first pass average is greater than 10x Hysteresis Band
-		if ((IL4_Real_Avg > 10.0*HYSTERESIS_BAND) || (IL4_Real_Avg < -10.0*HYSTERESIS_BAND)) {
+		if ((IL1_Real_Avg > 1.0*FIRST_PASS_LIMIT) || (IL1_Real_Avg < -1.0*FIRST_PASS_LIMIT)) {
 			return 1;
 		}
+		if ((IL4_Real_Avg > 1.0*FIRST_PASS_LIMIT) || (IL4_Real_Avg < -1.0*FIRST_PASS_LIMIT)) {
+			return 1;
+		}
+		IL1_Offset = IL1_Real_Avg;
 		IL4_Offset = IL4_Real_Avg;
 	}
 	return 0;
@@ -1043,11 +1041,13 @@ void disableEPWM(void) {
 
 void haltOverVoltage(void) {
 	char flag = 0;
+	flag |= checkFirstPass();
 //	flag |= checkVDC1();
 //	flag |= checkVDC2();
 //	flag |= checkV2AB();
 
 //	flag |= checkVDC12();
+
 	flag |= checkIL1();
 	flag |= checkIL4();
 
@@ -1112,7 +1112,7 @@ void PWM8HysteresisControl() {
 			PWM8_seekUpperBand = 0;
 		}
 		else
-			EPwm8Regs.AQSFRC.bit.OTSFB = 0x1; // Output B High to charge inductor
+			EPwm8Regs.AQSFRC.bit.OTSFA = 0x1; // Output B High to charge inductor
 
 	}
 	// Seeking Lower Band
@@ -1122,7 +1122,7 @@ void PWM8HysteresisControl() {
 			PWM8_seekUpperBand = 1;
 		}
 		else
-			EPwm8Regs.AQSFRC.bit.OTSFA = 0x1; // Output A High to discharge inductor
+			EPwm8Regs.AQSFRC.bit.OTSFB = 0x1; // Output A High to discharge inductor
 	}
 }
 
@@ -1151,7 +1151,7 @@ __interrupt void cpu_timer0_isr(void) {
 	IL1_Ref = ((sgenIL1a.out + sgenIL1b.out + 32768) >> 4); // A+B
 	// IL1_Ref = ((triwave1.out + 32768) >> 4); // Ramp
 
-	IL1_Hyst_SetPoint = (IL1_Ref/4095.0) * 2.0;
+	IL1_Hyst_SetPoint = (IL1_Ref/4095.0) * 4.0;
 
 
 	PWM7HysteresisControl(); // Use EPWM7A,B as complementary pair for hysteresis control on IL1
@@ -1260,6 +1260,7 @@ static inline void setFreq(void) {
 	//
 	sgenIL1a.step_max = (maxOutputFreq_hz * 0x10000) / samplingFreq_hz;
 	sgenIL1b.step_max = (maxOutputFreq_hz * 0x10000) / samplingFreq_hz;
+	triwave1.step_max = (maxOutputFreq_hz * 0x10000) / samplingFreq_hz;
 
 	//
 	// Range(Q15) = 0x0000 -> 0x7FFF, freq(Q15) =
@@ -1267,6 +1268,7 @@ static inline void setFreq(void) {
 	//
 	sgenIL1a.freq = ((float) outputFreqA_hz / maxOutputFreq_hz) * 0x8000;
 	sgenIL1b.freq = ((float) outputFreqB_hz / maxOutputFreq_hz) * 0x8000;
+	triwave1.freq = ((float) outputFreqB_hz / maxOutputFreq_hz) * 0x8000;
 #elif SINEWAVE_TYPE==HIGH_PRECISION_SINE
 	//
 	// Range(Q0) = 0x00000000 -> 0x7FFFFFFF, step_max(Q0) =
@@ -1292,6 +1294,7 @@ static inline void setFreq(void) {
 static inline void setGain(void) {
 	sgenIL1a.gain = waveformGainA * 0x7FFF;   // Range(Q15) = 0x0000 -> 0x7FFF
 	sgenIL1b.gain = waveformGainB * 0x7FFF;   // Range(Q15) = 0x0000 -> 0x7FFF
+	triwave1.freq = waveformGainB * 0x7FFF;   // Range(Q15) = 0x0000 -> 0x7FFF
 }
 
 //
@@ -1300,6 +1303,7 @@ static inline void setGain(void) {
 static inline void setOffset(void) {
 	sgenIL1a.offset = waveformOffsetA * 0x7FFF; // Range(Q15) = 0x8000 -> 0x7FFF
 	sgenIL1b.offset = waveformOffsetB * 0x7FFF; // Range(Q15) = 0x8000 -> 0x7FFF
+	triwave1.offset = waveformOffsetB * 0x7FFF; // Range(Q15) = 0x8000 -> 0x7FFF
 }
 
 //
@@ -1360,8 +1364,14 @@ void configureWaveform(void) {
 }
 
 void calcPI() {
-	PI_err_cur = VDC12_Real_Avg - VDC12_SetPoint;
-	PI_err_int = PI_err_int + delta_t * PI_err_cur;
+	PI_err_cur = VDC12_Real_Avg - VDC12_SetPoint; // Current Error
+
+	PI_err_int = PI_err_int + delta_t * PI_err_cur; // Integral Error
+	if (PI_err_int > IL4_Saturation)
+		PI_err_int = IL4_Saturation;
+	else if (PI_err_int < -1.0*IL4_Saturation)
+		PI_err_int = -1.0*IL4_Saturation;
+
 	PI_output = PI_Kp*PI_err_cur + PI_Ki*PI_err_int;
 	if (PI_output > IL4_Saturation) {
 		PI_output = IL4_Saturation;
