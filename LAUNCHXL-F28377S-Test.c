@@ -54,7 +54,7 @@
 #define VDC12_LIMIT 400.0
 
 #define IL1_LIMIT 5.0
-#define IL4_LIMIT 5.0
+#define IL4_LIMIT 7.5
 
 
 #define V2AB_LIMIT 200.0
@@ -246,14 +246,14 @@ double PI_err_old = 0.0; // old error
 double PI_err_int = 0.0; // integral of error
 double PI_output = 0.0; // PI Output
 
-double PI_Kp = 3.0;
-double PI_Ki = 5.0;
+double PI_Kp = 0.2;
+double PI_Ki = 2.0;
 double delta_t = 0.000005;
 
 double VDC12_SetPoint = 30.0;
 
 double PI_IL4_Ref = 0.0;
-double IL4_Saturation = 3.0;
+double IL4_Saturation = 5.0;
 
 double Vgrid_Max = 5.0;
 
